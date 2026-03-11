@@ -1,0 +1,33 @@
+{
+  "summary": "Completed backend + frontend regression for USD symbol-first formatting and new Weekly Operations admin view on public preview URL.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_enhancements_currency_landing.py",
+    "/app/backend/tests/test_paws_training_api.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "frontend/src/App.js remains very large (~1700+ lines); split by feature modules (public pages, admin shell, admin views) to reduce regression risk and improve maintainability."
+  ],
+  "updated_files": [
+    "/app/test_reports/iteration_3.json"
+  ],
+  "success_rate": {
+    "backend": "100%",
+    "frontend": "100%"
+  },
+  "seed_data_creation": "No explicit seed script created. Test bookings and logs continue to be generated through existing public/admin flows and prior regression tests.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Validated on REACT_APP_BACKEND_URL public endpoint. USD appears as $420/$6240 (not 420 US$) in landing/program/booking/dashboard and email-log content. Verified admin currency setting can switch to EUR and back; restored currency to USD at end. Confirmed separate admin nav/view for Vista semanal/Weekly Operations with week-grouped dog rows and required fields (dog, client, program, booking/payment/vaccination statuses). Existing reservations table still present and functional.",
+  "rca of the issue": "No functional defects reproduced for requested enhancement scope. Initial zero-count observation for weekly operation cards was a timing/selector-read race during first UI run; re-check after explicit wait showed 16 week groups and dog rows rendering correctly."
+}

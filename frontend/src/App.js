@@ -80,12 +80,16 @@ const LANDING_FEATURE_CARD_TEMPLATE = [
   { id: "email-mode", title_es: "", title_en: "", description_es: "", description_en: "" },
 ];
 
-const formatCurrency = (value, language, currencyCode = "USD") =>
-  new Intl.NumberFormat(language === "es" ? "es-ES" : "en-US", {
-    style: "currency",
-    currency: currencyCode,
-    maximumFractionDigits: 0,
-  }).format(Number(value || 0));
+const formatCurrency = (value, _language, currencyCode = "USD") => {
+  const symbols = {
+    USD: "$",
+    EUR: "€",
+    GBP: "£",
+  };
+  const amount = Number(value || 0);
+  const amountText = Number.isInteger(amount) ? `${amount}` : amount.toFixed(2).replace(/\.00$/, "").replace(/(\.[1-9])0$/, "$1");
+  return `${symbols[currencyCode] || "$"}${amountText}`;
+};
 
 const normalizeLandingContent = (landingContent = {}) => ({
   hero_description_es: landingContent?.hero_description_es || "",
@@ -1283,11 +1287,37 @@ const ProgramsView = ({ programs, language, onSaveProgram, currencyCode }) => {
   );
 };
 
-const CapacityView = ({ capacityWeeks, language, onSaveCapacity, bookings }) => {
+const CapacityView = ({ capacityWeeks, language, onSaveCapacity }) => {
   const t = translations[language];
   const [drafts, setDrafts] = useState({});
+
+  return (
+    <Card className="surface-panel rounded-[1.75rem] border-white/10" data-testid="admin-capacity-view">
+      <CardHeader>
+        <CardTitle className="text-white">{t.weeklyCapacityControl}</CardTitle>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        {capacityWeeks.map((week) => (
+          <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 md:grid-cols-[1fr_100px_150px] md:items-center" data-testid={`capacity-row-${week.week_start}`} key={week.week_start}>
+            <div>
+              <p className="font-semibold text-white">{week.label}</p>
+              <p className="text-sm text-zinc-500">{week.occupied} {t.occupiedLabel} · {week.remaining} {t.remainingLabel}</p>
+            </div>
+            <Input data-testid={`capacity-input-${week.week_start}`} onChange={(event) => setDrafts((current) => ({ ...current, [week.week_start]: event.target.value }))} type="number" value={drafts[week.week_start] ?? week.capacity} />
+            <Button className="rounded-full bg-primary text-white hover:bg-red-700" data-testid={`capacity-save-${week.week_start}`} onClick={() => onSaveCapacity(week.week_start, Number(drafts[week.week_start] ?? week.capacity))} type="button">
+              {t.saveWeek}
+            </Button>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+};
+
+const WeeklyOperationsView = ({ bookings, capacityWeeks, language }) => {
+  const t = translations[language];
   const operationalStatuses = ["Pending Review", "Approved", "Scheduled", "In Training", "Delivered"];
-  const dogsByWeek = useMemo(
+  const weeksWithDogs = useMemo(
     () =>
       capacityWeeks.map((week) => ({
         ...week,
@@ -1299,69 +1329,47 @@ const CapacityView = ({ capacityWeeks, language, onSaveCapacity, bookings }) => 
   );
 
   return (
-    <div className="grid gap-6" data-testid="admin-capacity-view">
-      <Card className="surface-panel rounded-[1.75rem] border-white/10">
-        <CardHeader>
-          <CardTitle className="text-white">{t.weeklyCapacityControl}</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4">
-          {capacityWeeks.map((week) => (
-            <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 md:grid-cols-[1fr_100px_150px] md:items-center" data-testid={`capacity-row-${week.week_start}`} key={week.week_start}>
+    <Card className="surface-panel rounded-[1.75rem] border-white/10" data-testid="admin-weekly-operations-view">
+      <CardHeader>
+        <CardTitle className="text-white">{t.weeklyOperationalView}</CardTitle>
+        <CardDescription className="text-zinc-400">{t.dogsAssignedThisWeek}</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        {weeksWithDogs.map((week) => (
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-4" data-testid={`operations-week-${week.week_start}`} key={week.week_start}>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="font-semibold text-white">{week.label}</p>
-                <p className="text-sm text-zinc-500">{week.occupied} {t.occupiedLabel} · {week.remaining} {t.remainingLabel}</p>
+                <p className="font-semibold text-white">{formatDisplayDate(week.week_start, language)}</p>
+                <p className="text-sm text-zinc-500">{week.week_start}</p>
               </div>
-              <Input data-testid={`capacity-input-${week.week_start}`} onChange={(event) => setDrafts((current) => ({ ...current, [week.week_start]: event.target.value }))} type="number" value={drafts[week.week_start] ?? week.capacity} />
-              <Button className="rounded-full bg-primary text-white hover:bg-red-700" data-testid={`capacity-save-${week.week_start}`} onClick={() => onSaveCapacity(week.week_start, Number(drafts[week.week_start] ?? week.capacity))} type="button">
-                {t.saveWeek}
-              </Button>
+              <Badge className={getStatusStyles(week.availability_label)}>{week.dogs.length} {language === "es" ? "perros" : "dogs"}</Badge>
             </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      <Card className="surface-panel rounded-[1.75rem] border-white/10">
-        <CardHeader>
-          <CardTitle className="text-white">{t.weeklyOperationalView}</CardTitle>
-          <CardDescription className="text-zinc-400">{t.dogsAssignedThisWeek}</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4">
-          {dogsByWeek.map((week) => (
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4" data-testid={`operations-week-${week.week_start}`} key={week.week_start}>
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="font-semibold text-white">{formatDisplayDate(week.week_start, language)}</p>
-                  <p className="text-sm text-zinc-500">{week.week_start}</p>
-                </div>
-                <Badge className={getStatusStyles(week.availability_label)}>{week.dogs.length} {language === "es" ? "perros" : "dogs"}</Badge>
-              </div>
-              {week.dogs.length ? (
-                <div className="grid gap-3">
-                  {week.dogs.map((booking) => (
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4" data-testid={`operations-dog-${week.week_start}-${booking.id}`} key={`${week.week_start}-${booking.id}`}>
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <p className="font-semibold text-white">{booking.dog.name}</p>
-                          <p className="text-sm text-zinc-400">{t.clientName}: {booking.owner.full_name}</p>
-                          <p className="text-sm text-zinc-500">{t.programName}: {language === "es" ? booking.program_name_es : booking.program_name_en}</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2 text-xs">
-                          <Badge className={getStatusStyles(booking.status)}>{t.bookingStatusLabel}: {t.status[booking.status] || booking.status}</Badge>
-                          <Badge className={getStatusStyles(booking.payment_status)}>{t.paymentValidationLabel}: {t.status[booking.payment_status] || booking.payment_status}</Badge>
-                          <Badge className={getStatusStyles(booking.vaccination_certificate_status)}>{t.vaccinationValidationLabel}: {t.status[booking.vaccination_certificate_status] || booking.vaccination_certificate_status}</Badge>
-                        </div>
+            {week.dogs.length ? (
+              <div className="grid gap-3">
+                {week.dogs.map((booking) => (
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4" data-testid={`operations-dog-${week.week_start}-${booking.id}`} key={`${week.week_start}-${booking.id}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-white">{booking.dog.name}</p>
+                        <p className="text-sm text-zinc-400">{t.clientName}: {booking.owner.full_name}</p>
+                        <p className="text-sm text-zinc-500">{t.programName}: {language === "es" ? booking.program_name_es : booking.program_name_en}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        <Badge className={getStatusStyles(booking.status)}>{t.bookingStatusLabel}: {t.status[booking.status] || booking.status}</Badge>
+                        <Badge className={getStatusStyles(booking.payment_status)}>{t.paymentValidationLabel}: {t.status[booking.payment_status] || booking.payment_status}</Badge>
+                        <Badge className={getStatusStyles(booking.vaccination_certificate_status)}>{t.vaccinationValidationLabel}: {t.status[booking.vaccination_certificate_status] || booking.vaccination_certificate_status}</Badge>
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-zinc-500" data-testid={`operations-empty-${week.week_start}`}>{t.noDogsAssigned}</p>
-              )}
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-zinc-500" data-testid={`operations-empty-${week.week_start}`}>{t.noDogsAssigned}</p>
+            )}
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 };
 
@@ -1598,6 +1606,7 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
   const navigationItems = [
     { key: "dashboard", label: t.dashboard, icon: LayoutDashboard },
     { key: "bookings", label: t.bookings, icon: FileText },
+    { key: "weekly-operations", label: t.weeklyOperationsNav, icon: CalendarRange },
     { key: "programs", label: t.programs, icon: Dog },
     { key: "capacity", label: t.capacity, icon: CalendarRange },
     { key: "settings", label: t.settings, icon: Settings },
@@ -1660,8 +1669,9 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
                   token={session.token}
                 />
               )}
+              {currentSection === "weekly-operations" && <WeeklyOperationsView bookings={bookings} capacityWeeks={capacityWeeks} language={language} />}
               {currentSection === "programs" && <ProgramsView currencyCode={config?.currency || "USD"} language={language} onSaveProgram={saveProgram} programs={programs} />}
-              {currentSection === "capacity" && <CapacityView bookings={bookings} capacityWeeks={capacityWeeks} language={language} onSaveCapacity={saveCapacity} />}
+              {currentSection === "capacity" && <CapacityView capacityWeeks={capacityWeeks} language={language} onSaveCapacity={saveCapacity} />}
               {currentSection === "settings" && (
                 <SettingsView
                   emailLogs={emailLogs}

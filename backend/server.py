@@ -271,7 +271,7 @@ def default_landing_content() -> Dict[str, Any]:
 def format_money(amount: float, currency_code: str) -> str:
     currency = CURRENCY_OPTIONS.get(currency_code, CURRENCY_OPTIONS["USD"])
     amount_value = float(amount or 0)
-    amount_text = f"{amount_value:,.0f}" if amount_value.is_integer() else f"{amount_value:,.2f}"
+    amount_text = f"{amount_value:.0f}" if amount_value.is_integer() else f"{amount_value:.2f}".rstrip("0").rstrip(".")
     return f"{currency['symbol']}{amount_text}"
 
 
