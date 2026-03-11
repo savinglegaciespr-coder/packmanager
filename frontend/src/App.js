@@ -306,49 +306,51 @@ const LandingPage = ({ config, programs, language, setLanguage }) => {
   return (
     <div className="app-shell" data-testid="landing-page">
       <PublicHeader config={config} language={language} setLanguage={setLanguage} t={t} />
-      <main className="section-shell space-y-12 pb-12 pt-10">
-        <section className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-stretch">
-          <div className="surface-panel reveal-up rounded-[2rem] p-8 md:p-12">
+      <main className="section-shell space-y-12 pb-12 pt-12 md:pt-16">
+        <section className="hero-section grid lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,420px)] lg:items-center">
+          <div className="hero-copy-panel surface-panel reveal-up rounded-[2rem]">
             <Badge className="mb-6 border border-red-500/20 bg-red-500/10 px-4 py-2 text-xs uppercase tracking-[0.25em] text-red-200" data-testid="hero-label">
               {t.heroLabel}
             </Badge>
-            <h1 className="max-w-3xl text-4xl font-semibold leading-tight text-white sm:text-5xl lg:text-6xl" data-testid="hero-title">
+            <h1 className="hero-title max-w-3xl font-semibold text-white" data-testid="hero-title">
               {config?.business_name || "PAWS TRAINING"}
             </h1>
-            <p className="mt-4 max-w-2xl text-base text-zinc-300 md:text-lg" data-testid="hero-slogan">
+            <p className="hero-slogan" data-testid="hero-slogan">
               {config?.slogan || "BY PET LOVERS SITTING"}
             </p>
-            <p className="mt-6 max-w-2xl text-sm leading-7 text-zinc-400 sm:text-base" data-testid="hero-body">
+            <p className="hero-description" data-testid="hero-body">
               {getLocalizedLandingText(landingContent, "hero_description", language, t.heroBody)}
             </p>
-            <div className="mt-8 flex flex-wrap gap-4">
+            <div className="hero-actions">
               <Link data-testid="hero-booking-link" to="/book">
-                <Button className="rounded-full bg-primary px-6 text-white hover:bg-red-700">
+                <Button className="hero-primary-button rounded-full bg-primary text-white hover:bg-red-700">
                   {getLocalizedLandingText(landingContent, "reserve_button_label", language, t.reserveSpot)}
                 </Button>
               </Link>
               <Link data-testid="hero-admin-link" to="/admin/login">
-                <Button className="rounded-full border border-white/10 bg-transparent px-6 text-white hover:bg-white/5" variant="outline">
+                <Button className="hero-secondary-button rounded-full border border-white/10 bg-transparent text-white hover:bg-white/5" variant="outline">
                   {getLocalizedLandingText(landingContent, "admin_button_label", language, t.adminLogin)}
                 </Button>
               </Link>
             </div>
-            <div className="mt-10 grid gap-4 md:grid-cols-3">
+            <div className="hero-feature-grid">
               {landingContent.feature_cards.map((item) => (
-                <div className="rounded-2xl border border-white/10 bg-black/20 p-4" data-testid={`hero-stat-${item.id}`} key={item.id}>
+                <div className="hero-feature-card" data-testid={`hero-stat-${item.id}`} key={item.id}>
                   <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{language === "es" ? item.title_es : item.title_en}</p>
                   <p className="mt-2 text-sm font-semibold leading-6 text-white">{language === "es" ? item.description_es : item.description_en}</p>
                 </div>
               ))}
             </div>
           </div>
-          <div className="hero-frame reveal-up delay-1 min-h-[520px] p-6">
-            <img alt="Premium dog training" className="absolute inset-0 h-full w-full object-cover object-center opacity-80" src={heroImageSrc} />
-            <div className="flex h-full flex-col justify-end rounded-[1.5rem] border border-white/10 bg-black/30 p-8">
+          <div className="hero-image-column reveal-up delay-1">
+            <div className="hero-frame" data-testid="hero-image-frame">
+              <img alt="Premium dog training" className="hero-image" src={heroImageSrc} />
+              <div className="hero-image-overlay">
               <p className="text-xs uppercase tracking-[0.25em] text-zinc-300">{t.brandTagline}</p>
               <p className="mt-4 max-w-md text-2xl font-semibold text-white md:text-3xl" data-testid="hero-side-copy">
                 {t.heroTitle}
               </p>
+              </div>
             </div>
           </div>
         </section>
