@@ -307,7 +307,7 @@ const LandingPage = ({ config, programs, language, setLanguage }) => {
     <div className="app-shell" data-testid="landing-page">
       <PublicHeader config={config} language={language} setLanguage={setLanguage} t={t} />
       <main className="section-shell space-y-12 pb-12 pt-12 md:pt-16">
-        <section className="hero-section grid lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,420px)] lg:items-center">
+        <section className="hero-section grid lg:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)] lg:items-center">
           <div className="hero-copy-panel surface-panel reveal-up rounded-[2rem]">
             <Badge className="mb-6 border border-red-500/20 bg-red-500/10 px-4 py-2 text-xs uppercase tracking-[0.25em] text-red-200" data-testid="hero-label">
               {t.heroLabel}
@@ -345,12 +345,6 @@ const LandingPage = ({ config, programs, language, setLanguage }) => {
           <div className="hero-image-column reveal-up delay-1">
             <div className="hero-frame" data-testid="hero-image-frame">
               <img alt="Premium dog training" className="hero-image" src={heroImageSrc} />
-              <div className="hero-image-overlay">
-              <p className="text-xs uppercase tracking-[0.25em] text-zinc-300">{t.brandTagline}</p>
-              <p className="mt-4 max-w-md text-2xl font-semibold text-white md:text-3xl" data-testid="hero-side-copy">
-                {t.heroTitle}
-              </p>
-              </div>
             </div>
           </div>
         </section>

@@ -20,7 +20,8 @@
     border-radius: 1.5rem;
     border: 1px solid rgba(255, 255, 255, 0.08);
     background: #111114;
-    width: min(100%, 420px);
+    width: 100%;
+    max-width: 560px;
     aspect-ratio: 4 / 5;
     margin: 0 auto;
     box-shadow: 0 28px 90px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.04);
@@ -134,6 +135,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    min-height: 100%;
 }
 
 .hero-image {
@@ -144,17 +146,6 @@
     object-fit: cover;
     object-position: center;
     opacity: 0.84;
-}
-
-.hero-image-overlay {
-    display: flex;
-    height: 100%;
-    flex-direction: column;
-    justify-content: flex-end;
-    border-radius: 1.5rem;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.02), rgba(0, 0, 0, 0.28));
-    padding: clamp(1.25rem, 3vw, 2rem);
 }
 
 .soft-divider {
