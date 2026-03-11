@@ -83,6 +83,7 @@ Core business rules:
 - Refined the landing hero into a reusable premium image frame with a controlled 4:5 portrait container, stronger CTA hierarchy, improved spacing, and more polished feature cards for any admin-uploaded hero image
 - Removed all text overlay from the hero image area and restored the right side to a large clean full-height visual panel that adapts to any uploaded hero image without affecting layout integrity
 - Finalized the hero image as a true full-height right-column panel with no overlay, no card styling, and exact height alignment to the left hero content for a premium SaaS-style landing layout
+- Completed a manual deployment-readiness pass: verified supervisor is already configured/running in the environment, confirmed frontend/API health responses, and replaced external fallback landing images with local bundled assets for safer deployment behavior
 - Implemented FastAPI backend for public config, programs, weeks, booking submission, admin auth, dashboard, bookings, settings, logo upload, document access, and capacity management
 - Added weekly capacity engine with multi-week occupancy protection, override support, and 24-hour pending expiration logic
 - Added admin workspace with dashboard charts/metrics, bookings filters, detail dialog, document status controls, manual booking creation, programs management, capacity controls, settings, and email log view

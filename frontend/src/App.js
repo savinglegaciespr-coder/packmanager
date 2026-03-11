@@ -61,10 +61,8 @@ import { toast } from "sonner";
 import { adminApi, openProtectedDocument, publicApi } from "@/lib/api";
 import { translations } from "@/lib/translations";
 
-const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1758125981639-c0925cd2da5f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzB8MHwxfHNlYXJjaHw0fHxkb2clMjB0cmFpbmluZyUyMHByb2Zlc3Npb25hbCUyMHN0dWRpbyUyMGRhcmslMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc3MzE5Mzk2M3ww&ixlib=rb-4.1.0&q=85";
-const CONTENT_IMAGE =
-  "https://images.unsplash.com/photo-1536164261511-3a17e671d380?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTZ8MHwxfHNlYXJjaHwyfHxoYXBweSUyMGRvZyUyMHBvcnRyYWl0JTIwcGxheWZ1bCUyMHNpbHZlciUyMHJlZCUyMGFlc3RoZXRpY3xlbnwwfHx8fDE3NzMxOTM5NjR8MA&ixlib=rb-4.1.0&q=85";
+const HERO_IMAGE = "/assets/hero-default.jpg";
+const CONTENT_IMAGE = "/assets/program-default.jpg";
 const CHART_COLORS = ["#dc2626", "#d4d4d8", "#22c55e", "#3b82f6", "#facc15", "#8b5cf6"];
 const STATUS_OPTIONS = ["Pending Review", "Approved", "Rejected", "Scheduled", "In Training", "Delivered", "Cancelled", "Expired"];
 const DOC_STATUS_OPTIONS = ["Pending Review", "Verified", "Invalid"];
