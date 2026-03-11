@@ -727,14 +727,10 @@ const AdminLoginPage = ({ config, language, setLanguage, onLogin }) => {
   const t = translations[language];
   const navigate = useNavigate();
   const [formState, setFormState] = useState({
-    email: config?.demo_admin?.email || "",
-    password: config?.demo_admin?.password || "",
+    email: "",
+    password: "",
   });
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    setFormState({ email: config?.demo_admin?.email || "", password: config?.demo_admin?.password || "" });
-  }, [config]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -763,11 +759,6 @@ const AdminLoginPage = ({ config, language, setLanguage, onLogin }) => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-zinc-300">
-            <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-5" data-testid="demo-credentials-panel">
-              <p className="text-xs uppercase tracking-[0.2em] text-red-100">{t.demoCredentials}</p>
-              <p className="mt-3 text-sm">{config?.demo_admin?.email}</p>
-              <p className="text-sm">{config?.demo_admin?.password}</p>
-            </div>
             <div className="rounded-2xl border border-white/10 bg-black/20 p-5 text-sm leading-7 text-zinc-400">
               {language === "es"
                 ? "Los correos del MVP quedan registrados internamente hasta que añadas credenciales SMTP reales en una siguiente fase."

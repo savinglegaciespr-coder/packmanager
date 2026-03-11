@@ -1062,7 +1062,6 @@ async def get_public_config() -> Dict[str, Any]:
         "landing_content": settings_doc.get("landing_content", default_landing_content()),
         "logo_url": settings_doc.get("logo_url") or ("/api/public/assets/logo" if settings_doc.get("logo_asset") else ""),
         "landing_hero_image_url": settings_doc.get("landing_hero_image_url") or ("/api/public/assets/landing-hero" if settings_doc.get("landing_hero_image_asset") else ""),
-        "demo_admin": {"email": DEMO_ADMIN_EMAIL, "password": DEMO_ADMIN_PASSWORD},
         "operational_start": OPERATIONAL_START.isoformat(),
     }
 
