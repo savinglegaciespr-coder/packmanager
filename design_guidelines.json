@@ -1,0 +1,161 @@
+{
+  "metadata": {
+    "project_name": "PAWS TRAINING",
+    "description": "Premium dog training business MVP with public booking and private admin dashboard.",
+    "version": "1.0.0",
+    "last_updated": "2024-05-22"
+  },
+  "identity": {
+    "brand_name": "PAWS TRAINING",
+    "slogan": "BY PET LOVERS SITTING",
+    "tone": "Premium, Trustworthy, Authoritative, Caring, Exclusive",
+    "aesthetic": "Dark Mode, Silver & Red Accents, Modern, Polished",
+    "languages": ["es", "en"]
+  },
+  "design_system": {
+    "theme": {
+      "default": "dark",
+      "mode": "class",
+      "strategy": "The app defaults to dark mode. The toggle allows users to switch, but the primary brand identity is built on dark surfaces."
+    },
+    "colors": {
+      "palette": {
+        "background": "#09090b",
+        "foreground": "#fafafa",
+        "card": "#18181b",
+        "card_foreground": "#fafafa",
+        "popover": "#09090b",
+        "popover_foreground": "#fafafa",
+        "primary": "#dc2626",
+        "primary_foreground": "#fafafa",
+        "secondary": "#27272a",
+        "secondary_foreground": "#fafafa",
+        "muted": "#27272a",
+        "muted_foreground": "#a1a1aa",
+        "accent": "#27272a",
+        "accent_foreground": "#fafafa",
+        "destructive": "#7f1d1d",
+        "destructive_foreground": "#fafafa",
+        "border": "#27272a",
+        "input": "#27272a",
+        "ring": "#dc2626"
+      },
+      "semantic": {
+        "success": "#22c55e",
+        "warning": "#facc15",
+        "error": "#ef4444",
+        "info": "#3b82f6",
+        "silver": "#d4d4d8"
+      }
+    },
+    "typography": {
+      "font_family": {
+        "sans": ["Inter", "sans-serif"],
+        "heading": ["Montserrat", "sans-serif"],
+        "mono": ["JetBrains Mono", "monospace"]
+      },
+      "weights": {
+        "light": 300,
+        "regular": 400,
+        "medium": 500,
+        "semibold": 600,
+        "bold": 700,
+        "black": 900
+      },
+      "instructions": "Use Montserrat for all Headings (h1-h4) to give a premium, athletic feel. Use Inter for body text for maximum readability."
+    },
+    "spacing": {
+      "container_padding": "p-6 md:p-12 lg:p-16",
+      "section_gap": "gap-8 md:gap-16",
+      "component_gap": "gap-4"
+    },
+    "radius": {
+      "default": "0.5rem",
+      "sm": "0.3rem",
+      "lg": "0.75rem",
+      "full": "9999px"
+    },
+    "shadows": {
+      "card": "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
+      "hover": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -2px rgb(0 0 0 / 0.1)",
+      "glow": "0 0 15px rgba(220, 38, 38, 0.3)"
+    }
+  },
+  "layout_strategies": {
+    "public_landing": {
+      "structure": "Hero Section -> Services Grid -> Process Steps -> Contact/Footer",
+      "hero_style": "Full viewport height (min-h-screen) with dark overlay image and bold centered typography.",
+      "grid_style": "Bento Grid or Asymmetrical Grid for services. Use silver borders for accents."
+    },
+    "admin_dashboard": {
+      "structure": "Sidebar Navigation (Left) -> Top Bar (Breadcrumbs/User) -> Main Content Area",
+      "grid_style": "High Density Grid (3-4 columns). Cards for metrics. Tables for booking lists.",
+      "card_style": "Flat background (zinc-900) with subtle 1px border (zinc-800). No heavy shadows."
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-primary text-primary-foreground hover:bg-red-700 shadow-glow transition-all duration-300 font-semibold uppercase tracking-wide",
+      "secondary": "bg-secondary text-secondary-foreground hover:bg-zinc-700 font-medium",
+      "outline": "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+      "ghost": "hover:bg-accent hover:text-accent-foreground"
+    },
+    "cards": {
+      "default": "bg-card text-card-foreground rounded-lg border border-border shadow-sm p-6",
+      "interactive": "hover:border-primary/50 transition-colors duration-300 cursor-pointer"
+    },
+    "inputs": {
+      "default": "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+    },
+    "badges": {
+      "status_pending": "bg-yellow-500/15 text-yellow-500 border-yellow-500/20",
+      "status_approved": "bg-green-500/15 text-green-500 border-green-500/20",
+      "status_rejected": "bg-red-500/15 text-red-500 border-red-500/20",
+      "status_default": "bg-zinc-800 text-zinc-300 border-zinc-700"
+    }
+  },
+  "assets": {
+    "hero_images": [
+      {
+        "url": "https://images.unsplash.com/photo-1758125981639-c0925cd2da5f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzB8MHwxfHNlYXJjaHw0fHxkb2clMjB0cmFpbmluZyUyMHByb2Zlc3Npb25hbCUyMHN0dWRpbyUyMGRhcmslMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc3MzE5Mzk2M3ww&ixlib=rb-4.1.0&q=85",
+        "alt": "Sleek black Great Dane on dark background",
+        "category": "hero-main"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1619105395391-f9b2737f9073?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzB8MHwxfHNlYXJjaHwyfHxkb2clMjB0cmFpbmluZyUyMHByb2Zlc3Npb25hbCUyMHN0dWRpbyUyMGRhcmslMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc3MzE5Mzk2M3ww&ixlib=rb-4.1.0&q=85",
+        "alt": "Black Labrador Retriever profile",
+        "category": "hero-secondary"
+      }
+    ],
+    "content_images": [
+      {
+        "url": "https://images.unsplash.com/photo-1536164261511-3a17e671d380?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTZ8MHwxfHNlYXJjaHwyfHxoYXBweSUyMGRvZyUyMHBvcnRyYWl0JTIwcGxheWZ1bCUyMHNpbHZlciUyMHJlZCUyMGFlc3RoZXRpY3xlbnwwfHx8fDE3NzMxOTM5NjR8MA&ixlib=rb-4.1.0&q=85",
+        "alt": "Black dog with red bandanna",
+        "category": "service-highlight"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1592604073267-48ec0acf6f5a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTZ8MHwxfHNlYXJjaHwxfHxoYXBweSUyMGRvZyUyMHBvcnRyYWl0JTIwcGxheWZ1bCUyMHNpbHZlciUyMHJlZCUyMGFlc3RoZXRpY3xlbnwwfHx8fDE3NzMxOTM5NjR8MA&ixlib=rb-4.1.0&q=85",
+        "alt": "White and black short coated dog",
+        "category": "testimonial"
+      }
+    ]
+  },
+  "accessibility": {
+    "contrast": "Ensure all text meets WCAG AA standards (4.5:1). Use lighter grey (zinc-300) on dark backgrounds, never dark grey.",
+    "focus_states": "Visible red ring (ring-2 ring-red-600) on all interactive elements.",
+    "semantic_html": "Use proper heading hierarchy (h1 -> h2 -> h3). Use <main>, <nav>, <aside> landmarks."
+  },
+  "universal_guidelines": [
+    "Do NOT use gradients for backgrounds, keep them solid or subtle noise.",
+    "Do NOT use Inter for Headings, use Montserrat.",
+    "Use 'sonner' for toasts.",
+    "All interactive elements MUST include data-testid attributes.",
+    "Do NOT use generic AI emojis.",
+    "Components must use named exports.",
+    "Pages must use default exports.",
+    "Use 2-3x more spacing than typical.",
+    "Use Shadcn components for complex interactions (Datepicker, Dialog, etc).",
+    "Never center align the app container text-align globally.",
+    "Do not use transparent backgrounds on headers without blur/scrim."
+  ]
+}
