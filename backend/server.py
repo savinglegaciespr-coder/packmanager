@@ -402,11 +402,9 @@ async def ensure_seed_data() -> None:
     await ensure_demo_admin()
 
     booking_count = await db.bookings.count_documents({})
-    if booking_count:
-        return
-
-    programs = {program["id"]: program for program in await db.programs.find({}, {"_id": 0}).to_list(50)}
-    seed_bookings = [
+    if not booking_count:
+        programs = {program["id"]: program for program in await db.programs.find({}, {"_id": 0}).to_list(50)}
+        seed_bookings = [
         build_seed_booking(
             booking_id="seed-1",
             program=programs["basic-6-day"],
@@ -621,8 +619,46 @@ async def ensure_seed_data() -> None:
             delivery_date="2026-04-12",
             internal_notes="Completed with excellent results.",
         ),
-    ]
-    await db.bookings.insert_many([booking.copy() for booking in seed_bookings])
+        ]
+        await db.bookings.insert_many([booking.copy() for booking in seed_bookings])
+
+    if not await db.email_logs.count_documents({}):
+        sample_logs = [
+            {
+                "id": str(uuid.uuid4()),
+                "recipient": "admin@pawstraining.com",
+                "subject": "Nueva reserva pendiente — Nina",
+                "body": "Nueva reserva enviada por Diego Martín para Nina en la semana 2026-03-30. Estado inicial: Pending Review.",
+                "audience": "admin",
+                "booking_id": "seed-2",
+                "locale": "es",
+                "mode": "internal_log",
+                "created_at": "2026-03-24T09:15:00+00:00",
+            },
+            {
+                "id": str(uuid.uuid4()),
+                "recipient": "lucia@example.com",
+                "subject": "PAWS TRAINING — Reserva aprobada",
+                "body": "Hola Lucía Ortega, la reserva para Rocco fue aprobada. Semana de ingreso: 2026-03-30.",
+                "audience": "client",
+                "booking_id": "seed-1",
+                "locale": "es",
+                "mode": "internal_log",
+                "created_at": "2026-03-23T14:30:00+00:00",
+            },
+            {
+                "id": str(uuid.uuid4()),
+                "recipient": "patricia@example.com",
+                "subject": "PAWS TRAINING — Reserva aprobada",
+                "body": "Hola Patricia Mora, la reserva para Kira fue aprobada. Semana de ingreso: 2026-04-06.",
+                "audience": "client",
+                "booking_id": "seed-8",
+                "locale": "es",
+                "mode": "internal_log",
+                "created_at": "2026-03-25T11:00:00+00:00",
+            },
+        ]
+        await db.email_logs.insert_many([log.copy() for log in sample_logs])
 
 
 async def expire_stale_bookings() -> int:

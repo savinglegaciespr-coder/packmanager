@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "@/App.css";
 import {
   Bar,
@@ -8,7 +8,6 @@ import {
   Legend,
   Pie,
   PieChart,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
@@ -136,6 +135,34 @@ const LanguageToggle = ({ language, setLanguage }) => (
   </div>
 );
 
+const MeasuredChart = ({ children, className = "h-[320px]" }) => {
+  const containerRef = useRef(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) return undefined;
+
+    const updateSize = () => {
+      const rect = element.getBoundingClientRect();
+      setSize({ width: Math.floor(rect.width), height: Math.floor(rect.height) });
+    };
+
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(element);
+    window.requestAnimationFrame(updateSize);
+
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div className={`${className} min-w-0 w-full`} ref={containerRef}>
+      {size.width > 0 && size.height > 0 ? children(size) : <div className="h-full w-full rounded-2xl bg-white/5" />}
+    </div>
+  );
+};
+
 const PublicHeader = ({ config, language, setLanguage, t }) => (
   <header className="section-shell sticky top-0 z-40 pt-6">
     <div className="surface-panel flex flex-wrap items-center justify-between gap-4 rounded-3xl px-5 py-4 backdrop-blur">
@@ -190,11 +217,11 @@ const LandingPage = ({ config, programs, language, setLanguage }) => {
             </div>
             <div className="mt-10 grid gap-4 md:grid-cols-3">
               {[
-                { label: language === "es" ? "Capacidad base" : "Base capacity", value: "8 / semana" },
-                { label: language === "es" ? "Revisión" : "Review", value: language === "es" ? "Pago + vacunas" : "Payment + vaccines" },
-                { label: language === "es" ? "Modo email" : "Email mode", value: language === "es" ? "Registro interno" : "Internal log" },
+                { id: "base-capacity", label: language === "es" ? "Capacidad base" : "Base capacity", value: "8 / semana" },
+                { id: "review-scope", label: language === "es" ? "Revisión" : "Review", value: language === "es" ? "Pago + vacunas" : "Payment + vaccines" },
+                { id: "email-mode", label: language === "es" ? "Modo email" : "Email mode", value: language === "es" ? "Registro interno" : "Internal log" },
               ].map((item) => (
-                <div className="rounded-2xl border border-white/10 bg-black/20 p-4" data-testid={`hero-stat-${item.label}`} key={item.label}>
+                <div className="rounded-2xl border border-white/10 bg-black/20 p-4" data-testid={`hero-stat-${item.id}`} key={item.id}>
                   <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{item.label}</p>
                   <p className="mt-2 text-lg font-semibold text-white">{item.value}</p>
                 </div>
@@ -678,10 +705,10 @@ const BookingDetailDialog = ({ booking, language, onClose, onSave, token }) => {
 
   return (
     <Dialog onOpenChange={(open) => !open && onClose()} open={Boolean(booking)}>
-      <DialogContent className="max-w-4xl border-white/10 bg-zinc-950 text-white" data-testid="booking-detail-dialog">
+      <DialogContent aria-describedby="booking-detail-description" className="max-w-4xl border-white/10 bg-zinc-950 text-white" data-testid="booking-detail-dialog">
         <DialogHeader>
           <DialogTitle>{booking.dog.name} · {booking.owner.full_name}</DialogTitle>
-          <DialogDescription className="text-zinc-400">{booking.start_week} · {booking.program_name_es}</DialogDescription>
+          <DialogDescription className="text-zinc-400" id="booking-detail-description">{booking.start_week} · {booking.program_name_es} · {booking.owner.email}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
           <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-5">
@@ -793,9 +820,14 @@ const ManualBookingDialog = ({ open, onClose, programs, onCreate, language }) =>
 
   return (
     <Dialog onOpenChange={(visible) => !visible && onClose()} open={open}>
-      <DialogContent className="max-w-3xl border-white/10 bg-zinc-950 text-white" data-testid="manual-booking-dialog">
+      <DialogContent aria-describedby="manual-booking-description" className="max-w-3xl border-white/10 bg-zinc-950 text-white" data-testid="manual-booking-dialog">
         <DialogHeader>
           <DialogTitle>{t.manualBooking}</DialogTitle>
+          <DialogDescription className="text-zinc-400" id="manual-booking-description">
+            {language === "es"
+              ? "Registra compromisos existentes para reflejar ocupación real sin pasar por el formulario público."
+              : "Create already-committed client bookings so occupancy reflects real operating conditions."}
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 md:grid-cols-2">
           <select className="h-11 rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="manual-program-select" onChange={(event) => update("program_id", event.target.value)} value={formState.program_id}>
@@ -851,9 +883,10 @@ const DashboardView = ({ dashboard, language }) => {
             <CardHeader>
               <CardTitle className="text-white">{chart.title}</CardTitle>
             </CardHeader>
-            <CardContent className="h-[320px]">
-              <ResponsiveContainer>
-                <PieChart>
+            <CardContent>
+              <MeasuredChart>
+                {({ width, height }) => (
+                <PieChart height={height} width={width}>
                   <Pie data={dashboard.charts[chart.key]} dataKey="value" nameKey="name" outerRadius={100}>
                     {dashboard.charts[chart.key].map((entry, index) => (
                       <Cell fill={CHART_COLORS[(chartIndex + index) % CHART_COLORS.length]} key={entry.name} />
@@ -862,7 +895,8 @@ const DashboardView = ({ dashboard, language }) => {
                   <Tooltip />
                   <Legend />
                 </PieChart>
-              </ResponsiveContainer>
+                )}
+              </MeasuredChart>
             </CardContent>
           </Card>
         ))}
@@ -870,9 +904,10 @@ const DashboardView = ({ dashboard, language }) => {
           <CardHeader>
             <CardTitle className="text-white">{t.revenueByMonth}</CardTitle>
           </CardHeader>
-          <CardContent className="h-[320px]">
-            <ResponsiveContainer>
-              <BarChart data={dashboard.charts.revenue}>
+          <CardContent>
+            <MeasuredChart>
+              {({ width, height }) => (
+              <BarChart data={dashboard.charts.revenue} height={height} width={width}>
                 <CartesianGrid stroke="rgba(255,255,255,0.08)" />
                 <XAxis dataKey="month" stroke="#a1a1aa" />
                 <YAxis stroke="#a1a1aa" />
@@ -881,7 +916,8 @@ const DashboardView = ({ dashboard, language }) => {
                 <Bar dataKey="confirmed" fill="#22c55e" radius={[8, 8, 0, 0]} />
                 <Bar dataKey="pending" fill="#dc2626" radius={[8, 8, 0, 0]} />
               </BarChart>
-            </ResponsiveContainer>
+              )}
+            </MeasuredChart>
           </CardContent>
         </Card>
       </div>
