@@ -79,6 +79,7 @@ Core business rules:
 - Refined USD formatting to always use symbol-first values like $420 across the UI and emails, and added a dedicated separate admin view: Vista semanal / Weekly Operations
 - Added a second separate admin operational display mode: Modo Operaciones / Operations Screen, built for large screens/TVs with operational-only summary cards, grouped weekly dog assignments, and 30-second auto-refresh
 - Cleaned launch data from April 13, 2026 onward by removing future demo/test bookings, clearing future occupancy, and restoring clean weekly availability for real operations
+- Added configurable Landing Hero Image controls in admin settings with URL support and file-upload support, while keeping the existing landing layout and default dog hero fallback when no custom image is set
 - Implemented FastAPI backend for public config, programs, weeks, booking submission, admin auth, dashboard, bookings, settings, logo upload, document access, and capacity management
 - Added weekly capacity engine with multi-week occupancy protection, override support, and 24-hour pending expiration logic
 - Added admin workspace with dashboard charts/metrics, bookings filters, detail dialog, document status controls, manual booking creation, programs management, capacity controls, settings, and email log view
