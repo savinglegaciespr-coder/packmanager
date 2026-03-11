@@ -78,6 +78,7 @@ Core business rules:
 - Replaced the floating Emergent badge with a natural footer for public/admin layouts and applied currency-aware formatting to prices, summaries, dashboard revenue, and price-related internal emails
 - Refined USD formatting to always use symbol-first values like $420 across the UI and emails, and added a dedicated separate admin view: Vista semanal / Weekly Operations
 - Added a second separate admin operational display mode: Modo Operaciones / Operations Screen, built for large screens/TVs with operational-only summary cards, grouped weekly dog assignments, and 30-second auto-refresh
+- Cleaned launch data from April 13, 2026 onward by removing future demo/test bookings, clearing future occupancy, and restoring clean weekly availability for real operations
 - Implemented FastAPI backend for public config, programs, weeks, booking submission, admin auth, dashboard, bookings, settings, logo upload, document access, and capacity management
 - Added weekly capacity engine with multi-week occupancy protection, override support, and 24-hour pending expiration logic
 - Added admin workspace with dashboard charts/metrics, bookings filters, detail dialog, document status controls, manual booking creation, programs management, capacity controls, settings, and email log view
