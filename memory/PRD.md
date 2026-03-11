@@ -76,6 +76,7 @@ Core business rules:
 - Extended admin settings with configurable currency (USD/EUR/GBP) and dynamic landing content controls for hero copy, CTA labels, and the existing hero feature cards
 - Added a weekly operational view in admin capacity to show each week’s assigned dogs with booking/payment/vaccination statuses for faster operations review
 - Replaced the floating Emergent badge with a natural footer for public/admin layouts and applied currency-aware formatting to prices, summaries, dashboard revenue, and price-related internal emails
+- Refined USD formatting to always use symbol-first values like $420 across the UI and emails, and added a dedicated separate admin view: Vista semanal / Weekly Operations
 - Implemented FastAPI backend for public config, programs, weeks, booking submission, admin auth, dashboard, bookings, settings, logo upload, document access, and capacity management
 - Added weekly capacity engine with multi-week occupancy protection, override support, and 24-hour pending expiration logic
 - Added admin workspace with dashboard charts/metrics, bookings filters, detail dialog, document status controls, manual booking creation, programs management, capacity controls, settings, and email log view
