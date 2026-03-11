@@ -17,34 +17,19 @@
 .hero-frame {
     position: relative;
     overflow: hidden;
-    border-radius: 1.5rem;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: #111114;
+    border-radius: 0;
+    border: none;
+    background: transparent;
     width: 100%;
     max-width: 560px;
     aspect-ratio: 4 / 5;
     margin: 0 auto;
-    box-shadow: 0 28px 90px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.04);
-    transition: transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
-}
-
-.hero-frame:hover {
-    transform: translateY(-4px);
-    border-color: rgba(220, 38, 38, 0.25);
-    box-shadow: 0 34px 110px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(220, 38, 38, 0.08);
-}
-
-.hero-frame::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.78));
-    z-index: 1;
+    box-shadow: none;
 }
 
 .hero-frame > * {
     position: relative;
-    z-index: 2;
+    z-index: 1;
 }
 
 .hero-section {
@@ -146,7 +131,7 @@
     height: 100%;
     object-fit: cover;
     object-position: center;
-    opacity: 0.84;
+    opacity: 1;
 }
 
 @media (min-width: 1024px) {
