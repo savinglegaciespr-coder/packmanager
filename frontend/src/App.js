@@ -1373,6 +1373,123 @@ const WeeklyOperationsView = ({ bookings, capacityWeeks, language }) => {
   );
 };
 
+const OperationsSummaryCard = ({ title, value, icon: Icon, accentClass, testId }) => (
+  <Card className="surface-panel rounded-[2rem] border-white/10 p-0" data-testid={testId}>
+    <CardContent className="flex min-h-[200px] flex-col justify-between p-8">
+      <div className={`flex h-14 w-14 items-center justify-center rounded-2xl ${accentClass}`}>
+        <Icon className="h-7 w-7 text-white" />
+      </div>
+      <div>
+        <p className="text-sm uppercase tracking-[0.2em] text-zinc-500">{title}</p>
+        <p className="mt-4 text-5xl font-semibold text-white xl:text-6xl">{value}</p>
+      </div>
+    </CardContent>
+  </Card>
+);
+
+const OperationsScreenView = ({ bookings, capacityWeeks, dashboard, language, lastUpdated }) => {
+  const t = translations[language];
+  const operationalStatuses = ["Pending Review", "Approved", "Scheduled", "In Training", "Delivered"];
+
+  const weeksWithAssignments = useMemo(
+    () =>
+      capacityWeeks
+        .map((week) => ({
+          ...week,
+          dogs: bookings
+            .filter((booking) => operationalStatuses.includes(booking.status) && booking.week_starts?.includes(week.week_start))
+            .sort((left, right) => left.dog.name.localeCompare(right.dog.name)),
+        }))
+        .filter((week) => week.dogs.length > 0),
+    [bookings, capacityWeeks],
+  );
+
+  const summaryCards = [
+    { key: "pending-intake", title: t.dogsPendingIntake, value: dashboard?.metrics?.dogs_pending_intake ?? 0, icon: CalendarRange, accentClass: "bg-yellow-500/30" },
+    { key: "in-training", title: t.dogsInTraining, value: dashboard?.metrics?.dogs_in_training ?? 0, icon: Dog, accentClass: "bg-blue-500/30" },
+    { key: "delivered", title: t.dogsDelivered, value: dashboard?.metrics?.dogs_delivered ?? 0, icon: CheckCircle2, accentClass: "bg-green-500/30" },
+    { key: "almost-full", title: t.nearlyFullWeeks, value: dashboard?.metrics?.nearly_full_weeks ?? 0, icon: AlertTriangle, accentClass: "bg-orange-500/30" },
+    { key: "full-weeks", title: t.fullWeeks, value: dashboard?.metrics?.full_weeks ?? 0, icon: PawPrint, accentClass: "bg-red-500/30" },
+  ];
+
+  return (
+    <div className="grid gap-6" data-testid="admin-operations-screen-view">
+      <Card className="surface-panel rounded-[2rem] border-white/10">
+        <CardContent className="flex flex-wrap items-center justify-between gap-4 p-8">
+          <div>
+            <p className="text-xs uppercase tracking-[0.25em] text-zinc-500">PAWS TRAINING</p>
+            <h2 className="mt-3 text-4xl font-semibold text-white xl:text-5xl" data-testid="operations-screen-title">{t.operationsScreenTitle}</h2>
+            <p className="mt-3 max-w-3xl text-lg text-zinc-400">{t.operationsScreenSubtitle}</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-black/20 px-5 py-4 text-right" data-testid="operations-screen-refresh-status">
+            <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{t.autoRefresh30Seconds}</p>
+            <p className="mt-2 text-sm text-zinc-300">{t.lastUpdated}: {lastUpdated}</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 xl:grid-cols-5 md:grid-cols-2">
+        {summaryCards.map((card) => (
+          <OperationsSummaryCard
+            accentClass={card.accentClass}
+            icon={card.icon}
+            key={card.key}
+            testId={`operations-summary-${card.key}`}
+            title={card.title}
+            value={card.value}
+          />
+        ))}
+      </div>
+
+      <Card className="surface-panel rounded-[2rem] border-white/10">
+        <CardHeader>
+          <CardTitle className="text-3xl text-white">{t.weeklyOperationalView}</CardTitle>
+          <CardDescription className="text-zinc-400">{t.dogsAssignedThisWeek}</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-5">
+          {weeksWithAssignments.length ? (
+            weeksWithAssignments.map((week) => (
+              <div className="rounded-[1.75rem] border border-white/10 bg-black/20 p-6" data-testid={`operations-screen-week-${week.week_start}`} key={week.week_start}>
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <p className="text-2xl font-semibold text-white">{formatDisplayDate(week.week_start, language)}</p>
+                    <p className="mt-1 text-sm text-zinc-500">{week.week_start}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-3 text-sm">
+                    <Badge className="border-white/10 bg-white/5 px-4 py-2 text-zinc-200">{week.remaining} {t.remainingLabel}</Badge>
+                    <Badge className={`${getStatusStyles(week.availability_label)} px-4 py-2`}>{t.status[week.availability_label]}</Badge>
+                  </div>
+                </div>
+
+                <div className="grid gap-4">
+                  {week.dogs.map((booking) => (
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-5" data-testid={`operations-screen-dog-${week.week_start}-${booking.id}`} key={`${week.week_start}-${booking.id}`}>
+                      <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                          <p className="text-2xl font-semibold text-white">{booking.dog.name}</p>
+                          <p className="mt-1 text-base text-zinc-300">{t.clientName}: {booking.owner.full_name}</p>
+                          <p className="mt-1 text-base text-zinc-500">{t.programName}: {language === "es" ? booking.program_name_es : booking.program_name_en}</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2 text-sm">
+                          <Badge className={`${getStatusStyles(booking.status)} px-4 py-2`}>{t.bookingStatusLabel}: {t.status[booking.status] || booking.status}</Badge>
+                          <Badge className={`${getStatusStyles(booking.payment_status)} px-4 py-2`}>{t.paymentValidationLabel}: {t.status[booking.payment_status] || booking.payment_status}</Badge>
+                          <Badge className={`${getStatusStyles(booking.vaccination_certificate_status)} px-4 py-2`}>{t.vaccinationValidationLabel}: {t.status[booking.vaccination_certificate_status] || booking.vaccination_certificate_status}</Badge>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="rounded-2xl border border-white/10 bg-white/5 p-8 text-lg text-zinc-400" data-testid="operations-screen-empty-state">{t.noAssignedDogsScreen}</p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
 const SettingsView = ({ settings, emailLogs, onSaveSettings, onUploadLogo, language }) => {
   const t = translations[language];
   const [formState, setFormState] = useState(normalizeSettingsState(settings));
@@ -1495,9 +1612,13 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
   const [settings, setSettings] = useState(null);
   const [emailLogs, setEmailLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState(() => new Date().toLocaleTimeString(language === "es" ? "es-ES" : "en-US"));
+  const currentSection = location.pathname.split("/")[2] || "dashboard";
 
-  const refreshAll = useCallback(async () => {
-    setLoading(true);
+  const refreshAll = useCallback(async (showLoader = true) => {
+    if (showLoader) {
+      setLoading(true);
+    }
     try {
       const [dashboardResponse, bookingsResponse, programsResponse, capacityResponse, settingsResponse, emailLogsResponse] = await Promise.all([
         adminApi.getDashboard(session.token),
@@ -1513,14 +1634,17 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
       setCapacityWeeks(capacityResponse);
       setSettings(settingsResponse);
       setEmailLogs(emailLogsResponse);
+      setLastUpdated(new Date().toLocaleTimeString(language === "es" ? "es-ES" : "en-US"));
     } catch (error) {
       toast.error(error.message);
       onLogout();
       navigate("/admin/login");
     } finally {
-      setLoading(false);
+      if (showLoader) {
+        setLoading(false);
+      }
     }
-  }, [navigate, onLogout, session.token]);
+  }, [language, navigate, onLogout, session.token]);
 
   useEffect(() => {
     if (location.pathname === "/admin") {
@@ -1532,7 +1656,17 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
     refreshAll();
   }, [refreshAll]);
 
-  const currentSection = location.pathname.split("/")[2] || "dashboard";
+  useEffect(() => {
+    if (currentSection !== "operations-screen") {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      refreshAll(false);
+    }, 30000);
+
+    return () => window.clearInterval(intervalId);
+  }, [currentSection, refreshAll]);
 
   const saveBooking = async (bookingId, payload) => {
     try {
@@ -1605,6 +1739,7 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
 
   const navigationItems = [
     { key: "dashboard", label: t.dashboard, icon: LayoutDashboard },
+    { key: "operations-screen", label: t.operationsScreenNav, icon: Home },
     { key: "bookings", label: t.bookings, icon: FileText },
     { key: "weekly-operations", label: t.weeklyOperationsNav, icon: CalendarRange },
     { key: "programs", label: t.programs, icon: Dog },
@@ -1658,6 +1793,15 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
           ) : (
             <>
               {currentSection === "dashboard" && <DashboardView currencyCode={config?.currency || "USD"} dashboard={dashboard} language={language} />}
+              {currentSection === "operations-screen" && (
+                <OperationsScreenView
+                  bookings={bookings}
+                  capacityWeeks={capacityWeeks}
+                  dashboard={dashboard}
+                  language={language}
+                  lastUpdated={lastUpdated}
+                />
+              )}
               {currentSection === "bookings" && (
                 <BookingsView
                   bookings={bookings}
