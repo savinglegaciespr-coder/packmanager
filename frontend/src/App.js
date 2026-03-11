@@ -77,6 +77,73 @@ const formatCurrency = (value, language) =>
     maximumFractionDigits: 0,
   }).format(Number(value || 0));
 
+const calculateDogAge = (dateOfBirth, language) => {
+  if (!dateOfBirth) return "";
+
+  const birthDate = new Date(`${dateOfBirth}T00:00:00`);
+  if (Number.isNaN(birthDate.getTime())) return "";
+
+  const today = new Date();
+  let years = today.getFullYear() - birthDate.getFullYear();
+  let months = today.getMonth() - birthDate.getMonth();
+  const days = today.getDate() - birthDate.getDate();
+
+  if (days < 0) {
+    months -= 1;
+  }
+  if (months < 0) {
+    years -= 1;
+    months += 12;
+  }
+
+  if (years < 0) return "";
+
+  if (language === "es") {
+    if (years > 0 && months > 0) return `${years} ${years === 1 ? "año" : "años"} y ${months} ${months === 1 ? "mes" : "meses"}`;
+    if (years > 0) return `${years} ${years === 1 ? "año" : "años"}`;
+    return `${months} ${months === 1 ? "mes" : "meses"}`;
+  }
+
+  if (years > 0 && months > 0) return `${years} ${years === 1 ? "year" : "years"} and ${months} ${months === 1 ? "month" : "months"}`;
+  if (years > 0) return `${years} ${years === 1 ? "year" : "years"}`;
+  return `${months} ${months === 1 ? "month" : "months"}`;
+};
+
+const formatDisplayDate = (isoDate, language) => {
+  if (!isoDate) return "";
+  const dateValue = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(dateValue.getTime())) return isoDate;
+  return new Intl.DateTimeFormat(language === "es" ? "es-ES" : "en-US", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(dateValue);
+};
+
+const parseDogDateInput = (value, language) => {
+  if (!value) return "";
+  const segments = value.split("/");
+  if (segments.length !== 3) return "";
+
+  const [first, second, year] = segments.map((segment) => Number(segment));
+  if ([first, second, year].some((part) => Number.isNaN(part))) return "";
+
+  const day = language === "es" ? first : second;
+  const month = language === "es" ? second : first;
+  if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900) return "";
+
+  const parsed = new Date(year, month - 1, day);
+  if (
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    return "";
+  }
+
+  return `${year.toString().padStart(4, "0")}-${month.toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`;
+};
+
 const getStatusStyles = (status) => {
   if (["Approved", "Verified", "Eligible", "Delivered"].includes(status)) {
     return "border-green-500/25 bg-green-500/10 text-green-200";
@@ -350,11 +417,10 @@ const BookingPage = ({ config, programs, language, setLanguage }) => {
     owner_address: "",
     dog_name: "",
     breed: "",
-    age: "",
     sex: "Male",
     weight: "",
-    date_of_birth: "",
-    vaccination_status: "Up to date",
+    date_of_birth_input: "",
+    vaccination_status: language === "es" ? "Vacunas al día" : "Vaccines up to date",
     allergies: "",
     behavior_goals: "",
     current_medication: "",
@@ -363,6 +429,9 @@ const BookingPage = ({ config, programs, language, setLanguage }) => {
     payment_proof: null,
     vaccination_certificate: null,
   });
+
+  const normalizedDogBirthDate = useMemo(() => parseDogDateInput(formState.date_of_birth_input, language), [formState.date_of_birth_input, language]);
+  const computedDogAge = useMemo(() => calculateDogAge(normalizedDogBirthDate, language), [normalizedDogBirthDate, language]);
 
   const selectedProgram = useMemo(() => programs.find((program) => program.id === selectedProgramId), [programs, selectedProgramId]);
 
@@ -386,7 +455,14 @@ const BookingPage = ({ config, programs, language, setLanguage }) => {
   }, [programs, selectedProgramId]);
 
   useEffect(() => {
-    setFormState((current) => ({ ...current, locale: language }));
+    setFormState((current) => ({
+      ...current,
+      locale: language,
+      vaccination_status:
+        [translations.es.vaccinationUpToDate, translations.en.vaccinationUpToDate].includes(current.vaccination_status)
+          ? translations[language].vaccinationUpToDate
+          : current.vaccination_status,
+    }));
   }, [language]);
 
   useEffect(() => {
@@ -399,6 +475,10 @@ const BookingPage = ({ config, programs, language, setLanguage }) => {
     event.preventDefault();
     if (!formState.start_week) {
       toast.error(language === "es" ? "Selecciona una semana." : "Please select a week.");
+      return;
+    }
+    if (!normalizedDogBirthDate) {
+      toast.error(t.invalidDogBirthDate);
       return;
     }
     if (!formState.payment_proof || !formState.vaccination_certificate) {
@@ -414,6 +494,9 @@ const BookingPage = ({ config, programs, language, setLanguage }) => {
           payload.append(key, value);
         }
       });
+      payload.delete("date_of_birth_input");
+      payload.append("date_of_birth", normalizedDogBirthDate);
+      payload.append("age", computedDogAge);
       const response = await publicApi.submitBooking(payload);
       setBookingResult(response);
       toast.success(t.bookingSubmitted);
@@ -425,9 +508,9 @@ const BookingPage = ({ config, programs, language, setLanguage }) => {
         owner_address: "",
         dog_name: "",
         breed: "",
-        age: "",
         weight: "",
-        date_of_birth: "",
+        date_of_birth_input: "",
+        vaccination_status: t.vaccinationUpToDate,
         allergies: "",
         behavior_goals: "",
         current_medication: "",
@@ -490,7 +573,7 @@ const BookingPage = ({ config, programs, language, setLanguage }) => {
             <div>
               <div className="mb-3 flex items-center justify-between gap-4">
                 <label className="text-sm text-zinc-300">{t.selectWeek}</label>
-                {loadingWeeks && <span className="text-xs text-zinc-500">Loading...</span>}
+                {loadingWeeks && <span className="text-xs text-zinc-500">{t.loadingWeeks}</span>}
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 {weeks.map((week) => (
@@ -504,7 +587,7 @@ const BookingPage = ({ config, programs, language, setLanguage }) => {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-sm font-semibold text-white">{week.label}</p>
+                        <p className="text-sm font-semibold text-white">{formatDisplayDate(week.week_start, language)}</p>
                         <p className="mt-1 text-xs text-zinc-500">{week.week_start}</p>
                       </div>
                       <Badge className={getStatusStyles(week.availability_label)} data-testid={`week-status-${week.week_start}`}>
@@ -551,13 +634,18 @@ const BookingPage = ({ config, programs, language, setLanguage }) => {
                 </div>
                 <Input data-testid="dog-name-input" onChange={(event) => updateField("dog_name", event.target.value)} placeholder={t.dogName} required value={formState.dog_name} />
                 <Input data-testid="dog-breed-input" onChange={(event) => updateField("breed", event.target.value)} placeholder={t.breed} required value={formState.breed} />
-                <Input data-testid="dog-age-input" onChange={(event) => updateField("age", event.target.value)} placeholder={t.age} value={formState.age} />
                 <select className="h-11 rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="dog-sex-select" onChange={(event) => updateField("sex", event.target.value)} value={formState.sex}>
                   <option value="Male">{t.male}</option>
                   <option value="Female">{t.female}</option>
                 </select>
                 <Input data-testid="dog-weight-input" onChange={(event) => updateField("weight", event.target.value)} placeholder={t.weight} required value={formState.weight} />
-                <Input data-testid="dog-dob-input" onChange={(event) => updateField("date_of_birth", event.target.value)} required type="date" value={formState.date_of_birth} />
+                <div>
+                  <label className="mb-2 block text-sm text-zinc-300" data-testid="dog-dob-label">{t.dob}</label>
+                  <Input data-testid="dog-dob-input" inputMode="numeric" onChange={(event) => updateField("date_of_birth_input", event.target.value)} placeholder={t.dateInputPlaceholder} required type="text" value={formState.date_of_birth_input} />
+                  <p className="mt-2 text-sm text-zinc-400" data-testid="dog-age-display">
+                    {t.automaticAge}: <span className="text-zinc-200">{computedDogAge || t.agePending}</span>
+                  </p>
+                </div>
                 <Input data-testid="dog-vaccination-status-input" onChange={(event) => updateField("vaccination_status", event.target.value)} placeholder={t.vaccinationStatus} required value={formState.vaccination_status} />
                 <Input data-testid="dog-allergies-input" onChange={(event) => updateField("allergies", event.target.value)} placeholder={t.allergies} value={formState.allergies} />
                 <div className="md:col-span-2">
