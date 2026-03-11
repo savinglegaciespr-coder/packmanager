@@ -73,6 +73,9 @@ Core business rules:
 - Built bilingual public landing page with premium dark styling, responsive layout, language toggle, hero, programs, process, and contact sections
 - Built full public booking flow with live weekly availability, required uploads, and Pending Review reservation creation
 - Updated the public dog form to use Spanish-only wording for the key fields, removed manual age entry, and added automatic age calculation from the dog's birth date
+- Extended admin settings with configurable currency (USD/EUR/GBP) and dynamic landing content controls for hero copy, CTA labels, and the existing hero feature cards
+- Added a weekly operational view in admin capacity to show each week’s assigned dogs with booking/payment/vaccination statuses for faster operations review
+- Replaced the floating Emergent badge with a natural footer for public/admin layouts and applied currency-aware formatting to prices, summaries, dashboard revenue, and price-related internal emails
 - Implemented FastAPI backend for public config, programs, weeks, booking submission, admin auth, dashboard, bookings, settings, logo upload, document access, and capacity management
 - Added weekly capacity engine with multi-week occupancy protection, override support, and 24-hour pending expiration logic
 - Added admin workspace with dashboard charts/metrics, bookings filters, detail dialog, document status controls, manual booking creation, programs management, capacity controls, settings, and email log view
