@@ -175,6 +175,22 @@ export const adminApi = {
       return normalizeError(error);
     }
   },
+  async uploadLandingHeroImage(token, file) {
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const response = await client.post("/admin/settings/landing-hero-image", formData, {
+        ...authConfig(token),
+        headers: {
+          ...authConfig(token).headers,
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      return response.data;
+    } catch (error) {
+      return normalizeError(error);
+    }
+  },
   async getEmailLogs(token) {
     try {
       const response = await client.get("/admin/email-logs", authConfig(token));

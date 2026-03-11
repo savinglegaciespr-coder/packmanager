@@ -95,6 +95,7 @@ class SettingsUpdate(BaseModel):
     contact_address: Optional[str] = None
     admin_notification_email: Optional[str] = None
     logo_url: Optional[str] = None
+    landing_hero_image_url: Optional[str] = None
     service_label_es: Optional[str] = None
     service_label_en: Optional[str] = None
     booking_term_es: Optional[str] = None
@@ -293,6 +294,8 @@ def default_settings() -> Dict[str, Any]:
         "admin_notification_email": "admin@pawstraining.com",
         "logo_url": "",
         "logo_asset": None,
+        "landing_hero_image_url": "",
+        "landing_hero_image_asset": None,
         "service_label_es": "Programas de entrenamiento",
         "service_label_en": "Training programs",
         "booking_term_es": "Reserva",
@@ -442,6 +445,10 @@ async def ensure_seed_data() -> None:
             updates["admin_notification_email"] = defaults["admin_notification_email"]
         if current_settings.get("currency") not in CURRENCY_OPTIONS:
             updates["currency"] = defaults["currency"]
+        if "landing_hero_image_url" not in current_settings:
+            updates["landing_hero_image_url"] = defaults["landing_hero_image_url"]
+        if "landing_hero_image_asset" not in current_settings:
+            updates["landing_hero_image_asset"] = defaults["landing_hero_image_asset"]
 
         landing_content = current_settings.get("landing_content")
         if not isinstance(landing_content, dict):
@@ -1054,6 +1061,7 @@ async def get_public_config() -> Dict[str, Any]:
         "currency": settings_doc.get("currency", "USD"),
         "landing_content": settings_doc.get("landing_content", default_landing_content()),
         "logo_url": settings_doc.get("logo_url") or ("/api/public/assets/logo" if settings_doc.get("logo_asset") else ""),
+        "landing_hero_image_url": settings_doc.get("landing_hero_image_url") or ("/api/public/assets/landing-hero" if settings_doc.get("landing_hero_image_asset") else ""),
         "demo_admin": {"email": DEMO_ADMIN_EMAIL, "password": DEMO_ADMIN_PASSWORD},
         "operational_start": OPERATIONAL_START.isoformat(),
     }
@@ -1066,6 +1074,15 @@ async def get_logo_asset() -> FileResponse:
     if not logo_asset or not Path(logo_asset).exists():
         raise HTTPException(status_code=404, detail="Logo not found.")
     return FileResponse(Path(logo_asset))
+
+
+@api_router.get("/public/assets/landing-hero")
+async def get_landing_hero_asset() -> FileResponse:
+    settings_doc = await get_business_settings()
+    hero_asset = settings_doc.get("landing_hero_image_asset")
+    if not hero_asset or not Path(hero_asset).exists():
+        raise HTTPException(status_code=404, detail="Landing hero image not found.")
+    return FileResponse(Path(hero_asset))
 
 
 @api_router.get("/public/programs")
@@ -1405,6 +1422,18 @@ async def upload_logo(file: UploadFile = File(...), _: Dict[str, Any] = Depends(
         {"$set": {"logo_asset": logo_asset["path"], "updated_at": iso_now()}},
     )
     return {"logo_url": "/api/public/assets/logo"}
+
+
+@api_router.post("/admin/settings/landing-hero-image")
+async def upload_landing_hero_image(file: UploadFile = File(...), _: Dict[str, Any] = Depends(get_current_admin)) -> Dict[str, str]:
+    branding_dir = UPLOAD_DIR / "branding"
+    branding_dir.mkdir(parents=True, exist_ok=True)
+    hero_asset = await save_upload(file, branding_dir, "landing-hero")
+    await db.settings.update_one(
+        {"id": "business-config"},
+        {"$set": {"landing_hero_image_asset": hero_asset["path"], "updated_at": iso_now()}},
+    )
+    return {"landing_hero_image_url": "/api/public/assets/landing-hero"}
 
 
 @api_router.get("/admin/email-logs")

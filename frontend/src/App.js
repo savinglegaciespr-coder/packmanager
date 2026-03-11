@@ -302,6 +302,7 @@ const LandingPage = ({ config, programs, language, setLanguage }) => {
   const t = translations[language];
   const landingContent = normalizeLandingContent(config?.landing_content);
   const currencyCode = config?.currency || "USD";
+  const heroImageSrc = config?.landing_hero_image_url || HERO_IMAGE;
   return (
     <div className="app-shell" data-testid="landing-page">
       <PublicHeader config={config} language={language} setLanguage={setLanguage} t={t} />
@@ -342,7 +343,7 @@ const LandingPage = ({ config, programs, language, setLanguage }) => {
             </div>
           </div>
           <div className="hero-frame reveal-up delay-1 min-h-[520px] p-6">
-            <img alt="Premium dog training" className="absolute inset-0 h-full w-full object-cover object-center opacity-80" src={HERO_IMAGE} />
+            <img alt="Premium dog training" className="absolute inset-0 h-full w-full object-cover object-center opacity-80" src={heroImageSrc} />
             <div className="flex h-full flex-col justify-end rounded-[1.5rem] border border-white/10 bg-black/30 p-8">
               <p className="text-xs uppercase tracking-[0.25em] text-zinc-300">{t.brandTagline}</p>
               <p className="mt-4 max-w-md text-2xl font-semibold text-white md:text-3xl" data-testid="hero-side-copy">
@@ -1490,7 +1491,7 @@ const OperationsScreenView = ({ bookings, capacityWeeks, dashboard, language, la
   );
 };
 
-const SettingsView = ({ settings, emailLogs, onSaveSettings, onUploadLogo, language }) => {
+const SettingsView = ({ settings, emailLogs, onSaveSettings, onUploadLogo, onUploadLandingHeroImage, language }) => {
   const t = translations[language];
   const [formState, setFormState] = useState(normalizeSettingsState(settings));
 
@@ -1532,6 +1533,7 @@ const SettingsView = ({ settings, emailLogs, onSaveSettings, onUploadLogo, langu
           <Input className="md:col-span-2" data-testid="settings-contact-address-input" onChange={(event) => update("contact_address", event.target.value)} placeholder={t.contactAddress} value={formState.contact_address || ""} />
           <Input data-testid="settings-admin-email-input" onChange={(event) => update("admin_notification_email", event.target.value)} placeholder={t.adminNotificationEmail} value={formState.admin_notification_email || ""} />
           <Input data-testid="settings-logo-url-input" onChange={(event) => update("logo_url", event.target.value)} placeholder={t.logoUrl} value={formState.logo_url || ""} />
+          <Input data-testid="settings-landing-hero-image-url-input" onChange={(event) => update("landing_hero_image_url", event.target.value)} placeholder={t.landingHeroImageUrl} value={formState.landing_hero_image_url || ""} />
           <div className="md:col-span-2 rounded-2xl border border-white/10 bg-black/20 p-4">
             <label className="mb-2 block text-sm text-zinc-300" data-testid="settings-currency-label">{t.currency}</label>
             <select className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="settings-currency-select" onChange={(event) => update("currency", event.target.value)} value={formState.currency || "USD"}>
@@ -1539,9 +1541,16 @@ const SettingsView = ({ settings, emailLogs, onSaveSettings, onUploadLogo, langu
             </select>
             <p className="mt-2 text-sm text-zinc-500">{t.currencyHelp}</p>
           </div>
-          <div className="md:col-span-2 rounded-2xl border border-dashed border-white/10 bg-white/5 p-4">
-            <label className="mb-3 block text-sm text-zinc-300">{t.uploadLogo}</label>
-            <input data-testid="settings-logo-file-input" onChange={(event) => event.target.files?.[0] && onUploadLogo(event.target.files[0])} type="file" />
+          <div className="md:col-span-2 grid gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-4">
+              <label className="mb-3 block text-sm text-zinc-300">{t.uploadLogo}</label>
+              <input data-testid="settings-logo-file-input" onChange={(event) => event.target.files?.[0] && onUploadLogo(event.target.files[0])} type="file" />
+            </div>
+            <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-4">
+              <label className="mb-3 block text-sm text-zinc-300">{t.uploadLandingHeroImage}</label>
+              <input data-testid="settings-landing-hero-image-file-input" onChange={(event) => event.target.files?.[0] && onUploadLandingHeroImage(event.target.files[0])} type="file" />
+              <p className="mt-3 text-sm text-zinc-500">{t.landingHeroImageHelp}</p>
+            </div>
           </div>
           <div className="md:col-span-2 rounded-2xl border border-white/10 bg-black/20 p-5">
             <div className="mb-4">
@@ -1726,6 +1735,17 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
     }
   };
 
+  const uploadLandingHeroImage = async (file) => {
+    try {
+      await adminApi.uploadLandingHeroImage(session.token, file);
+      toast.success(t.settingsSaved);
+      await refreshAll();
+      await refreshPublicData();
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
+
   const createManualBooking = async (payload) => {
     try {
       await adminApi.createManualBooking(session.token, payload);
@@ -1821,6 +1841,7 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
                   emailLogs={emailLogs}
                   language={language}
                   onSaveSettings={saveSettings}
+                  onUploadLandingHeroImage={uploadLandingHeroImage}
                   onUploadLogo={uploadLogo}
                   settings={settings}
                 />
