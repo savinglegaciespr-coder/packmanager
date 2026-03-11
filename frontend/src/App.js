@@ -69,13 +69,45 @@ const CHART_COLORS = ["#dc2626", "#d4d4d8", "#22c55e", "#3b82f6", "#facc15", "#8
 const STATUS_OPTIONS = ["Pending Review", "Approved", "Rejected", "Scheduled", "In Training", "Delivered", "Cancelled", "Expired"];
 const DOC_STATUS_OPTIONS = ["Pending Review", "Verified", "Invalid"];
 const ELIGIBILITY_OPTIONS = ["Pending Review", "Eligible", "Ineligible"];
+const CURRENCY_OPTIONS = [
+  { value: "USD", label: "$ USD" },
+  { value: "EUR", label: "€ EUR" },
+  { value: "GBP", label: "£ GBP" },
+];
+const LANDING_FEATURE_CARD_TEMPLATE = [
+  { id: "base-capacity", title_es: "", title_en: "", description_es: "", description_en: "" },
+  { id: "review-scope", title_es: "", title_en: "", description_es: "", description_en: "" },
+  { id: "email-mode", title_es: "", title_en: "", description_es: "", description_en: "" },
+];
 
-const formatCurrency = (value, language) =>
+const formatCurrency = (value, language, currencyCode = "USD") =>
   new Intl.NumberFormat(language === "es" ? "es-ES" : "en-US", {
     style: "currency",
-    currency: "EUR",
+    currency: currencyCode,
     maximumFractionDigits: 0,
   }).format(Number(value || 0));
+
+const normalizeLandingContent = (landingContent = {}) => ({
+  hero_description_es: landingContent?.hero_description_es || "",
+  hero_description_en: landingContent?.hero_description_en || "",
+  reserve_button_label_es: landingContent?.reserve_button_label_es || "",
+  reserve_button_label_en: landingContent?.reserve_button_label_en || "",
+  admin_button_label_es: landingContent?.admin_button_label_es || "",
+  admin_button_label_en: landingContent?.admin_button_label_en || "",
+  feature_cards: LANDING_FEATURE_CARD_TEMPLATE.map((card, index) => ({
+    ...card,
+    ...(Array.isArray(landingContent?.feature_cards) ? landingContent.feature_cards[index] || {} : {}),
+  })),
+});
+
+const normalizeSettingsState = (settings = {}) => ({
+  ...settings,
+  currency: settings?.currency || "USD",
+  landing_content: normalizeLandingContent(settings?.landing_content),
+});
+
+const getLocalizedLandingText = (content, baseKey, language, fallback = "") =>
+  content?.[`${baseKey}_${language}`] || fallback;
 
 const calculateDogAge = (dateOfBirth, language) => {
   if (!dateOfBirth) return "";
@@ -177,6 +209,16 @@ const BrandMark = ({ config }) => (
   </div>
 );
 
+const AppFooter = ({ config, className = "" }) => (
+  <footer className={className} data-testid="app-footer">
+    <div className="section-shell pb-8 pt-2">
+      <div className="rounded-3xl border border-white/10 bg-white/5 px-6 py-4 text-center text-sm text-zinc-500">
+        © {config?.business_name || "PAWS TRAINING"}
+      </div>
+    </div>
+  </footer>
+);
+
 const LanguageToggle = ({ language, setLanguage }) => (
   <div className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1" data-testid="language-toggle">
     <Button
@@ -254,8 +296,10 @@ const PublicHeader = ({ config, language, setLanguage, t }) => (
 
 const LandingPage = ({ config, programs, language, setLanguage }) => {
   const t = translations[language];
+  const landingContent = normalizeLandingContent(config?.landing_content);
+  const currencyCode = config?.currency || "USD";
   return (
-    <div className="app-shell pb-16" data-testid="landing-page">
+    <div className="app-shell" data-testid="landing-page">
       <PublicHeader config={config} language={language} setLanguage={setLanguage} t={t} />
       <main className="section-shell space-y-12 pb-12 pt-10">
         <section className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-stretch">
@@ -270,27 +314,25 @@ const LandingPage = ({ config, programs, language, setLanguage }) => {
               {config?.slogan || "BY PET LOVERS SITTING"}
             </p>
             <p className="mt-6 max-w-2xl text-sm leading-7 text-zinc-400 sm:text-base" data-testid="hero-body">
-              {t.heroBody}
+              {getLocalizedLandingText(landingContent, "hero_description", language, t.heroBody)}
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
               <Link data-testid="hero-booking-link" to="/book">
-                <Button className="rounded-full bg-primary px-6 text-white hover:bg-red-700">{t.reserveSpot}</Button>
+                <Button className="rounded-full bg-primary px-6 text-white hover:bg-red-700">
+                  {getLocalizedLandingText(landingContent, "reserve_button_label", language, t.reserveSpot)}
+                </Button>
               </Link>
               <Link data-testid="hero-admin-link" to="/admin/login">
                 <Button className="rounded-full border border-white/10 bg-transparent px-6 text-white hover:bg-white/5" variant="outline">
-                  {t.adminLogin}
+                  {getLocalizedLandingText(landingContent, "admin_button_label", language, t.adminLogin)}
                 </Button>
               </Link>
             </div>
             <div className="mt-10 grid gap-4 md:grid-cols-3">
-              {[
-                { id: "base-capacity", label: language === "es" ? "Capacidad base" : "Base capacity", value: "8 / semana" },
-                { id: "review-scope", label: language === "es" ? "Revisión" : "Review", value: language === "es" ? "Pago + vacunas" : "Payment + vaccines" },
-                { id: "email-mode", label: language === "es" ? "Modo email" : "Email mode", value: language === "es" ? "Registro interno" : "Internal log" },
-              ].map((item) => (
+              {landingContent.feature_cards.map((item) => (
                 <div className="rounded-2xl border border-white/10 bg-black/20 p-4" data-testid={`hero-stat-${item.id}`} key={item.id}>
-                  <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{item.label}</p>
-                  <p className="mt-2 text-lg font-semibold text-white">{item.value}</p>
+                  <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{language === "es" ? item.title_es : item.title_en}</p>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-white">{language === "es" ? item.description_es : item.description_en}</p>
                 </div>
               ))}
             </div>
@@ -349,7 +391,7 @@ const LandingPage = ({ config, programs, language, setLanguage }) => {
                   </div>
                   <div className="text-right" data-testid={`program-price-${program.id}`}>
                     <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{t.price}</p>
-                    <p className="mt-2 text-lg font-semibold text-white">{formatCurrency(program.price, language)}</p>
+                    <p className="mt-2 text-lg font-semibold text-white">{formatCurrency(program.price, language, currencyCode)}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -398,12 +440,14 @@ const LandingPage = ({ config, programs, language, setLanguage }) => {
           </Card>
         </section>
       </main>
+      <AppFooter config={config} />
     </div>
   );
 };
 
 const BookingPage = ({ config, programs, language, setLanguage }) => {
   const t = translations[language];
+  const currencyCode = config?.currency || "USD";
   const [selectedProgramId, setSelectedProgramId] = useState(programs[0]?.id || "");
   const [weeks, setWeeks] = useState([]);
   const [loadingWeeks, setLoadingWeeks] = useState(false);
@@ -527,7 +571,7 @@ const BookingPage = ({ config, programs, language, setLanguage }) => {
   };
 
   return (
-    <div className="app-shell pb-16" data-testid="booking-page">
+    <div className="app-shell" data-testid="booking-page">
       <PublicHeader config={config} language={language} setLanguage={setLanguage} t={t} />
       <main className="section-shell grid gap-8 pb-12 pt-10 lg:grid-cols-[0.9fr_1.1fr]">
         <Card className="surface-panel h-fit rounded-[2rem] border-white/10">
@@ -566,7 +610,7 @@ const BookingPage = ({ config, programs, language, setLanguage }) => {
                 <p className="mt-2 text-sm text-zinc-400">{language === "es" ? selectedProgram.description_es : selectedProgram.description_en}</p>
                 <div className="mt-4 flex flex-wrap gap-4 text-sm text-zinc-300">
                   <span>{selectedProgram.duration_value} {selectedProgram.duration_unit === "weeks" ? t.weeks : t.days}</span>
-                  <span>{formatCurrency(selectedProgram.price, language)}</span>
+                  <span>{formatCurrency(selectedProgram.price, language, currencyCode)}</span>
                 </div>
               </div>
             )}
@@ -605,6 +649,7 @@ const BookingPage = ({ config, programs, language, setLanguage }) => {
               <div className="rounded-2xl border border-green-500/20 bg-green-500/10 p-4 text-sm text-green-100" data-testid="booking-success-panel">
                 <p className="font-semibold">{t.bookingSubmitted}</p>
                 <p className="mt-2">ID: {bookingResult.booking_id}</p>
+                <p className="mt-1">{t.reservationSummaryPrice}: {formatCurrency(selectedProgram?.price, language, currencyCode)}</p>
                 <p className="mt-1">
                   {t.reservationHeldUntil}: {bookingResult.reservation_expires_at}
                 </p>
@@ -674,6 +719,7 @@ const BookingPage = ({ config, programs, language, setLanguage }) => {
           </CardContent>
         </Card>
       </main>
+      <AppFooter config={config} />
     </div>
   );
 };
@@ -705,7 +751,7 @@ const AdminLoginPage = ({ config, language, setLanguage, onLogin }) => {
   };
 
   return (
-    <div className="app-shell pb-16" data-testid="admin-login-page">
+    <div className="app-shell" data-testid="admin-login-page">
       <PublicHeader config={config} language={language} setLanguage={setLanguage} t={t} />
       <main className="section-shell grid gap-8 pt-14 lg:grid-cols-[0.8fr_1fr]">
         <Card className="surface-panel rounded-[2rem] border-white/10">
@@ -745,6 +791,7 @@ const AdminLoginPage = ({ config, language, setLanguage, onLogin }) => {
           </CardContent>
         </Card>
       </main>
+      <AppFooter config={config} />
     </div>
   );
 };
@@ -761,7 +808,7 @@ const MetricCard = ({ title, value, subtitle, testId }) => (
   </Card>
 );
 
-const BookingDetailDialog = ({ booking, language, onClose, onSave, token }) => {
+const BookingDetailDialog = ({ booking, language, onClose, onSave, token, currencyCode }) => {
   const t = translations[language];
   const [formState, setFormState] = useState(null);
 
@@ -810,6 +857,11 @@ const BookingDetailDialog = ({ booking, language, onClose, onSave, token }) => {
               <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{t.dogLabel}</p>
               <p className="mt-2 text-sm text-zinc-200">{booking.dog.name} · {booking.dog.breed}</p>
               <p className="text-sm text-zinc-400">{booking.dog.behavior_goals}</p>
+            </div>
+            <div data-testid="booking-program-summary">
+              <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{t.programName}</p>
+              <p className="mt-2 text-sm text-zinc-200">{language === "es" ? booking.program_name_es : booking.program_name_en}</p>
+              <p className="text-sm text-zinc-400">{t.reservationSummaryPrice}: {formatCurrency(booking.program_price, language, currencyCode)}</p>
             </div>
             <div className="flex flex-wrap gap-2" data-testid="medical-flags-panel">
               {booking.medical_flags.map((flag) => (
@@ -951,7 +1003,7 @@ const ManualBookingDialog = ({ open, onClose, programs, onCreate, language }) =>
   );
 };
 
-const DashboardView = ({ dashboard, language }) => {
+const DashboardView = ({ dashboard, language, currencyCode }) => {
   const t = translations[language];
   if (!dashboard) return null;
   return (
@@ -964,6 +1016,8 @@ const DashboardView = ({ dashboard, language }) => {
         <MetricCard subtitle={t.bookings} testId="metric-dogs-delivered" title={t.dogsDelivered} value={dashboard.metrics.dogs_delivered} />
         <MetricCard subtitle={t.finance} testId="metric-pending-payments" title={t.pendingPayments} value={dashboard.metrics.pending_payments} />
         <MetricCard subtitle={t.finance} testId="metric-confirmed-payments" title={t.confirmedPayments} value={dashboard.metrics.confirmed_payments} />
+        <MetricCard subtitle={t.finance} testId="metric-confirmed-revenue" title={t.confirmedRevenue} value={formatCurrency(dashboard.metrics.confirmed_revenue, language, currencyCode)} />
+        <MetricCard subtitle={t.finance} testId="metric-pending-revenue" title={t.pendingRevenueMetric} value={formatCurrency(dashboard.metrics.pending_revenue, language, currencyCode)} />
       </div>
       <div className="grid gap-6 xl:grid-cols-3">
         {[{ key: "capacity_breakdown", title: t.capacityBreakdown }, { key: "dog_status_breakdown", title: t.dogStatusBreakdown }].map((chart, chartIndex) => (
@@ -998,8 +1052,8 @@ const DashboardView = ({ dashboard, language }) => {
               <BarChart data={dashboard.charts.revenue} height={height} width={width}>
                 <CartesianGrid stroke="rgba(255,255,255,0.08)" />
                 <XAxis dataKey="month" stroke="#a1a1aa" />
-                <YAxis stroke="#a1a1aa" />
-                <Tooltip />
+                <YAxis stroke="#a1a1aa" tickFormatter={(value) => formatCurrency(value, language, currencyCode)} />
+                <Tooltip formatter={(value) => formatCurrency(value, language, currencyCode)} />
                 <Legend />
                 <Bar dataKey="confirmed" fill="#22c55e" radius={[8, 8, 0, 0]} />
                 <Bar dataKey="pending" fill="#dc2626" radius={[8, 8, 0, 0]} />
@@ -1050,7 +1104,7 @@ const DashboardView = ({ dashboard, language }) => {
   );
 };
 
-const BookingsView = ({ bookings, programs, token, language, onUpdateBooking, onManualCreate }) => {
+const BookingsView = ({ bookings, programs, token, language, onUpdateBooking, onManualCreate, currencyCode }) => {
   const t = translations[language];
   const [filters, setFilters] = useState({ status: "all", programId: "all", weekStart: "all", search: "" });
   const [selectedBooking, setSelectedBooking] = useState(null);
@@ -1138,13 +1192,13 @@ const BookingsView = ({ bookings, programs, token, language, onUpdateBooking, on
           </div>
         </CardContent>
       </Card>
-      <BookingDetailDialog booking={selectedBooking} language={language} onClose={() => setSelectedBooking(null)} onSave={onUpdateBooking} token={token} />
+      <BookingDetailDialog booking={selectedBooking} currencyCode={currencyCode} language={language} onClose={() => setSelectedBooking(null)} onSave={onUpdateBooking} token={token} />
       <ManualBookingDialog language={language} onClose={() => setManualOpen(false)} onCreate={onManualCreate} open={manualOpen} programs={programs} />
     </div>
   );
 };
 
-const ProgramsView = ({ programs, language, onSaveProgram }) => {
+const ProgramsView = ({ programs, language, onSaveProgram, currencyCode }) => {
   const t = translations[language];
   const [editingProgram, setEditingProgram] = useState(null);
   const [formState, setFormState] = useState({
@@ -1193,7 +1247,7 @@ const ProgramsView = ({ programs, language, onSaveProgram }) => {
             </CardHeader>
             <CardContent className="text-sm text-zinc-300">
               <p>{program.description_es}</p>
-              <p className="mt-3 text-zinc-500">{program.duration_value} {program.duration_unit === "weeks" ? t.weeks : t.days} · {formatCurrency(program.price, language)}</p>
+              <p className="mt-3 text-zinc-500">{program.duration_value} {program.duration_unit === "weeks" ? t.weeks : t.days} · {formatCurrency(program.price, language, currencyCode)}</p>
             </CardContent>
           </Card>
         ))}
@@ -1229,43 +1283,115 @@ const ProgramsView = ({ programs, language, onSaveProgram }) => {
   );
 };
 
-const CapacityView = ({ capacityWeeks, language, onSaveCapacity }) => {
+const CapacityView = ({ capacityWeeks, language, onSaveCapacity, bookings }) => {
   const t = translations[language];
   const [drafts, setDrafts] = useState({});
+  const operationalStatuses = ["Pending Review", "Approved", "Scheduled", "In Training", "Delivered"];
+  const dogsByWeek = useMemo(
+    () =>
+      capacityWeeks.map((week) => ({
+        ...week,
+        dogs: bookings
+          .filter((booking) => operationalStatuses.includes(booking.status) && booking.week_starts?.includes(week.week_start))
+          .sort((left, right) => left.dog.name.localeCompare(right.dog.name)),
+      })),
+    [bookings, capacityWeeks],
+  );
+
   return (
-    <Card className="surface-panel rounded-[1.75rem] border-white/10" data-testid="admin-capacity-view">
-      <CardHeader>
-        <CardTitle className="text-white">{t.weeklyCapacityControl}</CardTitle>
-      </CardHeader>
-      <CardContent className="grid gap-4">
-        {capacityWeeks.map((week) => (
-          <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 md:grid-cols-[1fr_100px_150px] md:items-center" data-testid={`capacity-row-${week.week_start}`} key={week.week_start}>
-            <div>
-              <p className="font-semibold text-white">{week.label}</p>
-              <p className="text-sm text-zinc-500">{week.occupied} {t.occupiedLabel} · {week.remaining} {t.remainingLabel}</p>
+    <div className="grid gap-6" data-testid="admin-capacity-view">
+      <Card className="surface-panel rounded-[1.75rem] border-white/10">
+        <CardHeader>
+          <CardTitle className="text-white">{t.weeklyCapacityControl}</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4">
+          {capacityWeeks.map((week) => (
+            <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 md:grid-cols-[1fr_100px_150px] md:items-center" data-testid={`capacity-row-${week.week_start}`} key={week.week_start}>
+              <div>
+                <p className="font-semibold text-white">{week.label}</p>
+                <p className="text-sm text-zinc-500">{week.occupied} {t.occupiedLabel} · {week.remaining} {t.remainingLabel}</p>
+              </div>
+              <Input data-testid={`capacity-input-${week.week_start}`} onChange={(event) => setDrafts((current) => ({ ...current, [week.week_start]: event.target.value }))} type="number" value={drafts[week.week_start] ?? week.capacity} />
+              <Button className="rounded-full bg-primary text-white hover:bg-red-700" data-testid={`capacity-save-${week.week_start}`} onClick={() => onSaveCapacity(week.week_start, Number(drafts[week.week_start] ?? week.capacity))} type="button">
+                {t.saveWeek}
+              </Button>
             </div>
-            <Input data-testid={`capacity-input-${week.week_start}`} onChange={(event) => setDrafts((current) => ({ ...current, [week.week_start]: event.target.value }))} type="number" value={drafts[week.week_start] ?? week.capacity} />
-            <Button className="rounded-full bg-primary text-white hover:bg-red-700" data-testid={`capacity-save-${week.week_start}`} onClick={() => onSaveCapacity(week.week_start, Number(drafts[week.week_start] ?? week.capacity))} type="button">
-              {t.saveWeek}
-            </Button>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card className="surface-panel rounded-[1.75rem] border-white/10">
+        <CardHeader>
+          <CardTitle className="text-white">{t.weeklyOperationalView}</CardTitle>
+          <CardDescription className="text-zinc-400">{t.dogsAssignedThisWeek}</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4">
+          {dogsByWeek.map((week) => (
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4" data-testid={`operations-week-${week.week_start}`} key={week.week_start}>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-white">{formatDisplayDate(week.week_start, language)}</p>
+                  <p className="text-sm text-zinc-500">{week.week_start}</p>
+                </div>
+                <Badge className={getStatusStyles(week.availability_label)}>{week.dogs.length} {language === "es" ? "perros" : "dogs"}</Badge>
+              </div>
+              {week.dogs.length ? (
+                <div className="grid gap-3">
+                  {week.dogs.map((booking) => (
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4" data-testid={`operations-dog-${week.week_start}-${booking.id}`} key={`${week.week_start}-${booking.id}`}>
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-white">{booking.dog.name}</p>
+                          <p className="text-sm text-zinc-400">{t.clientName}: {booking.owner.full_name}</p>
+                          <p className="text-sm text-zinc-500">{t.programName}: {language === "es" ? booking.program_name_es : booking.program_name_en}</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2 text-xs">
+                          <Badge className={getStatusStyles(booking.status)}>{t.bookingStatusLabel}: {t.status[booking.status] || booking.status}</Badge>
+                          <Badge className={getStatusStyles(booking.payment_status)}>{t.paymentValidationLabel}: {t.status[booking.payment_status] || booking.payment_status}</Badge>
+                          <Badge className={getStatusStyles(booking.vaccination_certificate_status)}>{t.vaccinationValidationLabel}: {t.status[booking.vaccination_certificate_status] || booking.vaccination_certificate_status}</Badge>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-zinc-500" data-testid={`operations-empty-${week.week_start}`}>{t.noDogsAssigned}</p>
+              )}
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
 const SettingsView = ({ settings, emailLogs, onSaveSettings, onUploadLogo, language }) => {
   const t = translations[language];
-  const [formState, setFormState] = useState(settings);
+  const [formState, setFormState] = useState(normalizeSettingsState(settings));
 
   useEffect(() => {
-    setFormState(settings);
+    setFormState(normalizeSettingsState(settings));
   }, [settings]);
 
   if (!formState) return null;
 
   const update = (key, value) => setFormState((current) => ({ ...current, [key]: value }));
+  const updateLandingField = (key, value) => setFormState((current) => ({
+    ...current,
+    landing_content: {
+      ...current.landing_content,
+      [key]: value,
+    },
+  }));
+  const updateFeatureCard = (index, key, value) => setFormState((current) => ({
+    ...current,
+    landing_content: {
+      ...current.landing_content,
+      feature_cards: current.landing_content.feature_cards.map((card, cardIndex) => (
+        cardIndex === index ? { ...card, [key]: value } : card
+      )),
+    },
+  }));
 
   return (
     <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]" data-testid="admin-settings-view">
@@ -1281,9 +1407,42 @@ const SettingsView = ({ settings, emailLogs, onSaveSettings, onUploadLogo, langu
           <Input className="md:col-span-2" data-testid="settings-contact-address-input" onChange={(event) => update("contact_address", event.target.value)} placeholder={t.contactAddress} value={formState.contact_address || ""} />
           <Input data-testid="settings-admin-email-input" onChange={(event) => update("admin_notification_email", event.target.value)} placeholder={t.adminNotificationEmail} value={formState.admin_notification_email || ""} />
           <Input data-testid="settings-logo-url-input" onChange={(event) => update("logo_url", event.target.value)} placeholder={t.logoUrl} value={formState.logo_url || ""} />
+          <div className="md:col-span-2 rounded-2xl border border-white/10 bg-black/20 p-4">
+            <label className="mb-2 block text-sm text-zinc-300" data-testid="settings-currency-label">{t.currency}</label>
+            <select className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="settings-currency-select" onChange={(event) => update("currency", event.target.value)} value={formState.currency || "USD"}>
+              {CURRENCY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+            <p className="mt-2 text-sm text-zinc-500">{t.currencyHelp}</p>
+          </div>
           <div className="md:col-span-2 rounded-2xl border border-dashed border-white/10 bg-white/5 p-4">
             <label className="mb-3 block text-sm text-zinc-300">{t.uploadLogo}</label>
             <input data-testid="settings-logo-file-input" onChange={(event) => event.target.files?.[0] && onUploadLogo(event.target.files[0])} type="file" />
+          </div>
+          <div className="md:col-span-2 rounded-2xl border border-white/10 bg-black/20 p-5">
+            <div className="mb-4">
+              <p className="text-sm font-semibold text-white">{t.landingContent}</p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Textarea data-testid="landing-description-es-input" onChange={(event) => updateLandingField("hero_description_es", event.target.value)} placeholder={t.landingDescriptionSpanish} value={formState.landing_content.hero_description_es} />
+              <Textarea data-testid="landing-description-en-input" onChange={(event) => updateLandingField("hero_description_en", event.target.value)} placeholder={t.landingDescriptionEnglish} value={formState.landing_content.hero_description_en} />
+              <Input data-testid="landing-book-cta-es-input" onChange={(event) => updateLandingField("reserve_button_label_es", event.target.value)} placeholder={t.reserveButtonSpanish} value={formState.landing_content.reserve_button_label_es} />
+              <Input data-testid="landing-book-cta-en-input" onChange={(event) => updateLandingField("reserve_button_label_en", event.target.value)} placeholder={t.reserveButtonEnglish} value={formState.landing_content.reserve_button_label_en} />
+              <Input data-testid="landing-admin-cta-es-input" onChange={(event) => updateLandingField("admin_button_label_es", event.target.value)} placeholder={t.adminButtonSpanish} value={formState.landing_content.admin_button_label_es} />
+              <Input data-testid="landing-admin-cta-en-input" onChange={(event) => updateLandingField("admin_button_label_en", event.target.value)} placeholder={t.adminButtonEnglish} value={formState.landing_content.admin_button_label_en} />
+            </div>
+            <div className="mt-5 grid gap-4">
+              {formState.landing_content.feature_cards.map((card, index) => (
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4" data-testid={`landing-feature-card-editor-${card.id}`} key={card.id}>
+                  <p className="mb-4 text-sm font-semibold text-white">{t.featureCardTitle} {index + 1}</p>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Input data-testid={`landing-feature-title-es-${card.id}`} onChange={(event) => updateFeatureCard(index, "title_es", event.target.value)} placeholder={t.featureTitleSpanish} value={card.title_es} />
+                    <Input data-testid={`landing-feature-title-en-${card.id}`} onChange={(event) => updateFeatureCard(index, "title_en", event.target.value)} placeholder={t.featureTitleEnglish} value={card.title_en} />
+                    <Textarea data-testid={`landing-feature-description-es-${card.id}`} onChange={(event) => updateFeatureCard(index, "description_es", event.target.value)} placeholder={t.featureDescriptionSpanish} value={card.description_es} />
+                    <Textarea data-testid={`landing-feature-description-en-${card.id}`} onChange={(event) => updateFeatureCard(index, "description_en", event.target.value)} placeholder={t.featureDescriptionEnglish} value={card.description_en} />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
           <div className="md:col-span-2 flex justify-end">
             <Button className="bg-primary text-white hover:bg-red-700" data-testid="settings-save-button" onClick={() => onSaveSettings(formState)} type="button">
@@ -1489,10 +1648,11 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
             <Card className="surface-panel rounded-[2rem] border-white/10 p-10 text-center text-zinc-400">{t.loadingAdmin}</Card>
           ) : (
             <>
-              {currentSection === "dashboard" && <DashboardView dashboard={dashboard} language={language} />}
+              {currentSection === "dashboard" && <DashboardView currencyCode={config?.currency || "USD"} dashboard={dashboard} language={language} />}
               {currentSection === "bookings" && (
                 <BookingsView
                   bookings={bookings}
+                  currencyCode={config?.currency || "USD"}
                   language={language}
                   onManualCreate={createManualBooking}
                   onUpdateBooking={saveBooking}
@@ -1500,8 +1660,8 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
                   token={session.token}
                 />
               )}
-              {currentSection === "programs" && <ProgramsView language={language} onSaveProgram={saveProgram} programs={programs} />}
-              {currentSection === "capacity" && <CapacityView capacityWeeks={capacityWeeks} language={language} onSaveCapacity={saveCapacity} />}
+              {currentSection === "programs" && <ProgramsView currencyCode={config?.currency || "USD"} language={language} onSaveProgram={saveProgram} programs={programs} />}
+              {currentSection === "capacity" && <CapacityView bookings={bookings} capacityWeeks={capacityWeeks} language={language} onSaveCapacity={saveCapacity} />}
               {currentSection === "settings" && (
                 <SettingsView
                   emailLogs={emailLogs}
@@ -1515,6 +1675,7 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
           )}
         </div>
       </div>
+      <AppFooter className="mt-6" config={config} />
     </div>
   );
 };

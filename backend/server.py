@@ -50,6 +50,11 @@ CONFIRMED_CAPACITY_STATUSES = {"Approved", "Scheduled", "In Training", "Delivere
 DOC_STATUS_VALUES = {"Pending Review", "Verified", "Invalid"}
 ELIGIBILITY_VALUES = {"Pending Review", "Eligible", "Ineligible"}
 ALLOWED_UPLOAD_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".webp"}
+CURRENCY_OPTIONS = {
+    "USD": {"symbol": "$", "label": "$ USD"},
+    "EUR": {"symbol": "€", "label": "€ EUR"},
+    "GBP": {"symbol": "£", "label": "£ GBP"},
+}
 bearer_scheme = HTTPBearer(auto_error=False)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -97,6 +102,8 @@ class SettingsUpdate(BaseModel):
     primary_color: Optional[str] = None
     accent_color: Optional[str] = None
     surface_color: Optional[str] = None
+    currency: Optional[Literal["USD", "EUR", "GBP"]] = None
+    landing_content: Optional[Dict[str, Any]] = None
 
 
 class BookingUpdateRequest(BaseModel):
@@ -227,6 +234,47 @@ def sanitize_booking(booking_doc: Dict[str, Any]) -> Dict[str, Any]:
     return booking
 
 
+def default_landing_content() -> Dict[str, Any]:
+    return {
+        "hero_description_es": "PAWS TRAINING combina una experiencia de reserva clara para clientes con un panel administrativo robusto para validar documentos, pagos y ocupación por semana.",
+        "hero_description_en": "PAWS TRAINING combines a clear client booking experience with a robust admin workspace for document validation, payments, and weekly occupancy control.",
+        "reserve_button_label_es": "Reservar espacio",
+        "reserve_button_label_en": "Book a spot",
+        "admin_button_label_es": "Acceso administrativo",
+        "admin_button_label_en": "Admin login",
+        "feature_cards": [
+            {
+                "id": "base-capacity",
+                "title_es": "Capacidad semanal",
+                "title_en": "Weekly capacity",
+                "description_es": "8 plazas base por semana con ajustes manuales por parte del administrador.",
+                "description_en": "8 base spots per week with manual admin overrides whenever needed.",
+            },
+            {
+                "id": "review-scope",
+                "title_es": "Revisión documental",
+                "title_en": "Document review",
+                "description_es": "Validación de comprobante de pago, vacunas y elegibilidad antes de aprobar.",
+                "description_en": "Payment proof, vaccination certificate, and eligibility are validated before approval.",
+            },
+            {
+                "id": "email-mode",
+                "title_es": "Notificaciones por email",
+                "title_en": "Email notifications",
+                "description_es": "Correos de reserva, aprobación y rechazo registrados internamente para control operativo.",
+                "description_en": "Booking, approval, and rejection emails are logged internally for operational control.",
+            },
+        ],
+    }
+
+
+def format_money(amount: float, currency_code: str) -> str:
+    currency = CURRENCY_OPTIONS.get(currency_code, CURRENCY_OPTIONS["USD"])
+    amount_value = float(amount or 0)
+    amount_text = f"{amount_value:,.0f}" if amount_value.is_integer() else f"{amount_value:,.2f}"
+    return f"{currency['symbol']}{amount_text}"
+
+
 async def get_business_settings() -> Dict[str, Any]:
     settings_doc = await db.settings.find_one({"id": "business-config"}, {"_id": 0})
     if not settings_doc:
@@ -252,6 +300,8 @@ def default_settings() -> Dict[str, Any]:
         "primary_color": "#dc2626",
         "accent_color": "#d4d4d8",
         "surface_color": "#18181b",
+        "currency": "USD",
+        "landing_content": default_landing_content(),
         "email_mode": "internal_log",
         "updated_at": iso_now(),
     }
@@ -382,14 +432,34 @@ async def ensure_demo_admin() -> None:
 
 
 async def ensure_seed_data() -> None:
+    defaults = default_settings()
     current_settings = await db.settings.find_one({"id": "business-config"}, {"_id": 0})
     if not current_settings:
-        await db.settings.insert_one(default_settings().copy())
-    elif str(current_settings.get("admin_notification_email", "")).endswith(".local"):
-        await db.settings.update_one(
-            {"id": "business-config"},
-            {"$set": {"admin_notification_email": default_settings()["admin_notification_email"], "updated_at": iso_now()}},
-        )
+        await db.settings.insert_one(defaults.copy())
+    else:
+        updates: Dict[str, Any] = {}
+        if str(current_settings.get("admin_notification_email", "")).endswith(".local"):
+            updates["admin_notification_email"] = defaults["admin_notification_email"]
+        if current_settings.get("currency") not in CURRENCY_OPTIONS:
+            updates["currency"] = defaults["currency"]
+
+        landing_content = current_settings.get("landing_content")
+        if not isinstance(landing_content, dict):
+            updates["landing_content"] = defaults["landing_content"]
+        else:
+            merged_landing = {**defaults["landing_content"], **landing_content}
+            existing_cards = landing_content.get("feature_cards") if isinstance(landing_content.get("feature_cards"), list) else []
+            merged_cards: List[Dict[str, Any]] = []
+            for index, default_card in enumerate(defaults["landing_content"]["feature_cards"]):
+                current_card = existing_cards[index] if index < len(existing_cards) and isinstance(existing_cards[index], dict) else {}
+                merged_cards.append({**default_card, **current_card})
+            merged_landing["feature_cards"] = merged_cards
+            if merged_landing != landing_content:
+                updates["landing_content"] = merged_landing
+
+        if updates:
+            updates["updated_at"] = iso_now()
+            await db.settings.update_one({"id": "business-config"}, {"$set": updates})
 
     for program in default_programs():
         existing = await db.programs.find_one({"id": program["id"]}, {"_id": 0})
@@ -800,25 +870,27 @@ async def queue_email(recipient: str, subject: str, body: str, *, audience: str,
 
 async def send_submission_emails(booking: Dict[str, Any], settings_doc: Dict[str, Any]) -> None:
     locale = booking.get("locale", "es")
+    price_label = format_money(float(booking.get("program_price", 0)), settings_doc.get("currency", "USD"))
+    program_name = booking["program_name_en"] if locale == "en" else booking["program_name_es"]
     if locale == "en":
         client_subject = "PAWS TRAINING — Booking received"
         client_body = (
             f"Hi {booking['owner']['full_name']},\n\n"
-            f"We received your booking request for {booking['dog']['name']}. "
-            f"Your selected start week is {booking['start_week']} and the reservation is held while our team reviews your documents."
+            f"We received your booking request for {booking['dog']['name']} in the {program_name}. "
+            f"Program total: {price_label}. Your selected start week is {booking['start_week']} and the reservation is held while our team reviews your documents."
         )
     else:
         client_subject = "PAWS TRAINING — Reserva recibida"
         client_body = (
             f"Hola {booking['owner']['full_name']},\n\n"
-            f"Hemos recibido tu solicitud para {booking['dog']['name']}. "
-            f"La semana elegida es {booking['start_week']} y la plaza queda reservada mientras revisamos tus documentos."
+            f"Hemos recibido tu solicitud para {booking['dog']['name']} en el programa {program_name}. "
+            f"Importe del programa: {price_label}. La semana elegida es {booking['start_week']} y la plaza queda reservada mientras revisamos tus documentos."
         )
 
     admin_subject = f"Nueva reserva pendiente — {booking['dog']['name']}"
     admin_body = (
         f"Nueva reserva enviada por {booking['owner']['full_name']} para {booking['dog']['name']} "
-        f"en la semana {booking['start_week']}. Estado inicial: Pending Review."
+        f"en la semana {booking['start_week']}. Programa: {booking['program_name_es']}. Importe: {price_label}. Estado inicial: Pending Review."
     )
     await queue_email(settings_doc["admin_notification_email"], admin_subject, admin_body, audience="admin", booking_id=booking["id"], locale="es")
     await queue_email(booking["owner"]["email"], client_subject, client_body, audience="client", booking_id=booking["id"], locale=locale)
@@ -827,24 +899,30 @@ async def send_submission_emails(booking: Dict[str, Any], settings_doc: Dict[str
 async def send_approval_email(booking: Dict[str, Any]) -> None:
     locale = booking.get("locale", "es")
     intake_week = booking.get("intake_date") or booking["start_week"]
+    settings_doc = await get_business_settings()
+    price_label = format_money(float(booking.get("program_price", 0)), settings_doc.get("currency", "USD"))
+    program_name = booking["program_name_en"] if locale == "en" else booking["program_name_es"]
     if locale == "en":
         subject = "PAWS TRAINING — Booking approved"
-        body = f"Hi {booking['owner']['full_name']}, your booking for {booking['dog']['name']} has been approved. Intake week: {intake_week}."
+        body = f"Hi {booking['owner']['full_name']}, your booking for {booking['dog']['name']} ({program_name}) has been approved. Program total: {price_label}. Intake week: {intake_week}."
     else:
         subject = "PAWS TRAINING — Reserva aprobada"
-        body = f"Hola {booking['owner']['full_name']}, la reserva para {booking['dog']['name']} fue aprobada. Semana de ingreso: {intake_week}."
+        body = f"Hola {booking['owner']['full_name']}, la reserva para {booking['dog']['name']} ({program_name}) fue aprobada. Importe del programa: {price_label}. Semana de ingreso: {intake_week}."
     await queue_email(booking["owner"]["email"], subject, body, audience="client", booking_id=booking["id"], locale=locale)
 
 
 async def send_rejection_email(booking: Dict[str, Any]) -> None:
     locale = booking.get("locale", "es")
     reason = booking.get("rejection_reason") or ""
+    settings_doc = await get_business_settings()
+    price_label = format_money(float(booking.get("program_price", 0)), settings_doc.get("currency", "USD"))
+    program_name = booking["program_name_en"] if locale == "en" else booking["program_name_es"]
     if locale == "en":
         subject = "PAWS TRAINING — Booking update"
-        body = f"Hi {booking['owner']['full_name']}, we are sorry, but your booking for {booking['dog']['name']} could not be approved. {reason}".strip()
+        body = f"Hi {booking['owner']['full_name']}, we are sorry, but your booking for {booking['dog']['name']} ({program_name}, {price_label}) could not be approved. {reason}".strip()
     else:
         subject = "PAWS TRAINING — Actualización de reserva"
-        body = f"Hola {booking['owner']['full_name']}, lamentablemente no pudimos aprobar la reserva para {booking['dog']['name']}. {reason}".strip()
+        body = f"Hola {booking['owner']['full_name']}, lamentablemente no pudimos aprobar la reserva para {booking['dog']['name']} ({program_name}, {price_label}). {reason}".strip()
     await queue_email(booking["owner"]["email"], subject, body, audience="client", booking_id=booking["id"], locale=locale)
 
 
@@ -860,6 +938,8 @@ async def build_dashboard_payload() -> Dict[str, Any]:
     pending_intake = 0
     in_training = 0
     delivered = 0
+    confirmed_revenue_total = 0.0
+    pending_revenue_total = 0.0
 
     for booking in bookings:
         dog_status_breakdown[booking["status"]] = dog_status_breakdown.get(booking["status"], 0) + 1
@@ -867,8 +947,10 @@ async def build_dashboard_payload() -> Dict[str, Any]:
         revenue_summary.setdefault(month_key, {"confirmed": 0.0, "pending": 0.0})
         if booking["status"] in {"Approved", "Scheduled", "In Training", "Delivered"}:
             revenue_summary[month_key]["confirmed"] += float(booking["program_price"])
+            confirmed_revenue_total += float(booking["program_price"])
         elif booking["status"] == "Pending Review":
             revenue_summary[month_key]["pending"] += float(booking["program_price"])
+            pending_revenue_total += float(booking["program_price"])
 
         if booking["payment_status"] == "Pending Review":
             pending_payments += 1
@@ -903,6 +985,8 @@ async def build_dashboard_payload() -> Dict[str, Any]:
             "dogs_delivered": delivered,
             "pending_payments": pending_payments,
             "confirmed_payments": confirmed_payments,
+            "confirmed_revenue": round(confirmed_revenue_total, 2),
+            "pending_revenue": round(pending_revenue_total, 2),
         },
         "weekly_occupancy": weeks,
         "charts": {
@@ -967,6 +1051,8 @@ async def get_public_config() -> Dict[str, Any]:
         "service_label_en": settings_doc["service_label_en"],
         "booking_term_es": settings_doc["booking_term_es"],
         "booking_term_en": settings_doc["booking_term_en"],
+        "currency": settings_doc.get("currency", "USD"),
+        "landing_content": settings_doc.get("landing_content", default_landing_content()),
         "logo_url": settings_doc.get("logo_url") or ("/api/public/assets/logo" if settings_doc.get("logo_asset") else ""),
         "demo_admin": {"email": DEMO_ADMIN_EMAIL, "password": DEMO_ADMIN_PASSWORD},
         "operational_start": OPERATIONAL_START.isoformat(),
