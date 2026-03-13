@@ -1,11 +1,16 @@
 import logging
 import math
 import os
+import smtplib
 import uuid
+import base64
+import hashlib
 from datetime import date, datetime, timedelta, timezone
+from email.message import EmailMessage
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
+from cryptography.fernet import Fernet, InvalidToken
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse
@@ -105,6 +110,11 @@ class SettingsUpdate(BaseModel):
     surface_color: Optional[str] = None
     currency: Optional[Literal["USD", "EUR", "GBP"]] = None
     landing_content: Optional[Dict[str, Any]] = None
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = None
+    smtp_tls: Optional[bool] = None
+    smtp_username: Optional[str] = None
+    smtp_password: Optional[str] = None
 
 
 class BookingUpdateRequest(BaseModel):
@@ -152,6 +162,22 @@ def utc_now() -> datetime:
 
 def iso_now() -> str:
     return utc_now().isoformat()
+
+
+def get_fernet() -> Fernet:
+    key = base64.urlsafe_b64encode(hashlib.sha256(JWT_SECRET.encode("utf-8")).digest())
+    return Fernet(key)
+
+
+def encrypt_secret(value: str) -> str:
+    return get_fernet().encrypt(value.encode("utf-8")).decode("utf-8")
+
+
+def decrypt_secret(value: str) -> str:
+    try:
+        return get_fernet().decrypt(value.encode("utf-8")).decode("utf-8")
+    except InvalidToken as exc:
+        raise HTTPException(status_code=500, detail="Stored SMTP password could not be decrypted.") from exc
 
 
 def parse_iso(value: Optional[str]) -> Optional[datetime]:
@@ -306,8 +332,21 @@ def default_settings() -> Dict[str, Any]:
         "currency": "USD",
         "landing_content": default_landing_content(),
         "email_mode": "internal_log",
+        "smtp_host": "smtp.gmail.com",
+        "smtp_port": 587,
+        "smtp_tls": True,
+        "smtp_username": "Pawstraningpr@gmail.com",
+        "smtp_password_encrypted": None,
         "updated_at": iso_now(),
     }
+
+
+def sanitize_settings(settings_doc: Dict[str, Any]) -> Dict[str, Any]:
+    sanitized = {key: value for key, value in settings_doc.items() if key not in {"_id", "smtp_password_encrypted"}}
+    sanitized["smtp_password"] = ""
+    sanitized["smtp_password_configured"] = bool(settings_doc.get("smtp_password_encrypted"))
+    sanitized["smtp_password_masked"] = "••••••••" if settings_doc.get("smtp_password_encrypted") else ""
+    return sanitized
 
 
 def default_programs() -> List[Dict[str, Any]]:
@@ -449,6 +488,16 @@ async def ensure_seed_data() -> None:
             updates["landing_hero_image_url"] = defaults["landing_hero_image_url"]
         if "landing_hero_image_asset" not in current_settings:
             updates["landing_hero_image_asset"] = defaults["landing_hero_image_asset"]
+        if not current_settings.get("smtp_host"):
+            updates["smtp_host"] = defaults["smtp_host"]
+        if not current_settings.get("smtp_port"):
+            updates["smtp_port"] = defaults["smtp_port"]
+        if "smtp_tls" not in current_settings:
+            updates["smtp_tls"] = defaults["smtp_tls"]
+        if not current_settings.get("smtp_username"):
+            updates["smtp_username"] = defaults["smtp_username"]
+        if "smtp_password_encrypted" not in current_settings:
+            updates["smtp_password_encrypted"] = defaults["smtp_password_encrypted"]
 
         landing_content = current_settings.get("landing_content")
         if not isinstance(landing_content, dict):
@@ -860,7 +909,40 @@ async def save_upload(upload: UploadFile, directory: Path, prefix: str) -> Dict[
     }
 
 
+def send_email_via_smtp(settings_doc: Dict[str, Any], recipient: str, subject: str, body: str) -> None:
+    smtp_password_encrypted = settings_doc.get("smtp_password_encrypted")
+    if not smtp_password_encrypted:
+        raise HTTPException(status_code=500, detail="SMTP password is not configured.")
+
+    password = decrypt_secret(smtp_password_encrypted)
+    message = EmailMessage()
+    message["Subject"] = subject
+    message["From"] = settings_doc["smtp_username"]
+    message["To"] = recipient
+    message.set_content(body)
+
+    with smtplib.SMTP(settings_doc["smtp_host"], int(settings_doc["smtp_port"]), timeout=20) as server:
+        if settings_doc.get("smtp_tls", True):
+            server.starttls()
+        server.login(settings_doc["smtp_username"], password)
+        server.send_message(message)
+
+
 async def queue_email(recipient: str, subject: str, body: str, *, audience: str, booking_id: str, locale: str) -> None:
+    settings_doc = await get_business_settings()
+    delivery_mode = settings_doc.get("email_mode", "internal_log")
+    delivery_status = "logged"
+    delivery_error = ""
+
+    if delivery_mode == "smtp":
+        try:
+            send_email_via_smtp(settings_doc, recipient, subject, body)
+            delivery_status = "sent"
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("SMTP delivery failed for %s", recipient)
+            delivery_status = "failed"
+            delivery_error = str(exc)
+
     email_log = {
         "id": str(uuid.uuid4()),
         "recipient": recipient,
@@ -869,7 +951,9 @@ async def queue_email(recipient: str, subject: str, body: str, *, audience: str,
         "audience": audience,
         "booking_id": booking_id,
         "locale": locale,
-        "mode": "internal_log",
+        "mode": delivery_mode,
+        "delivery_status": delivery_status,
+        "delivery_error": delivery_error,
         "created_at": iso_now(),
     }
     await db.email_logs.insert_one(email_log.copy())
@@ -1399,16 +1483,25 @@ async def update_capacity(week_start: str, payload: CapacityUpdate, _: Dict[str,
 @api_router.get("/admin/settings")
 async def get_settings(_: Dict[str, Any] = Depends(get_current_admin)) -> Dict[str, Any]:
     settings_doc = await get_business_settings()
-    return {key: value for key, value in settings_doc.items() if key != "_id"}
+    return sanitize_settings(settings_doc)
 
 
 @api_router.put("/admin/settings")
 async def update_settings(payload: SettingsUpdate, _: Dict[str, Any] = Depends(get_current_admin)) -> Dict[str, Any]:
     updates = payload.model_dump(exclude_none=True)
+    smtp_password = updates.pop("smtp_password", None)
+    if smtp_password and smtp_password.strip():
+        updates["smtp_password_encrypted"] = encrypt_secret(smtp_password.strip())
+        updates["email_mode"] = "smtp"
+    elif "email_mode" not in updates:
+        current_settings = await get_business_settings()
+        if current_settings.get("smtp_password_encrypted"):
+            updates["email_mode"] = "smtp"
+
     updates["updated_at"] = iso_now()
     await db.settings.update_one({"id": "business-config"}, {"$set": updates})
     updated = await db.settings.find_one({"id": "business-config"}, {"_id": 0})
-    return updated
+    return sanitize_settings(updated)
 
 
 @api_router.post("/admin/settings/logo")

@@ -106,6 +106,13 @@ const normalizeSettingsState = (settings = {}) => ({
   ...settings,
   currency: settings?.currency || "USD",
   landing_content: normalizeLandingContent(settings?.landing_content),
+  smtp_host: settings?.smtp_host || "smtp.gmail.com",
+  smtp_port: settings?.smtp_port || 587,
+  smtp_tls: typeof settings?.smtp_tls === "boolean" ? settings.smtp_tls : true,
+  smtp_username: settings?.smtp_username || "Pawstraningpr@gmail.com",
+  smtp_password: "",
+  smtp_password_masked: settings?.smtp_password_masked || "",
+  smtp_password_configured: Boolean(settings?.smtp_password_configured),
 });
 
 const getLocalizedLandingText = (content, baseKey, language, fallback = "") =>
@@ -754,8 +761,8 @@ const AdminLoginPage = ({ config, language, setLanguage, onLogin, showAdminAcces
           <CardContent className="space-y-4 text-zinc-300">
             <div className="rounded-2xl border border-white/10 bg-black/20 p-5 text-sm leading-7 text-zinc-400">
               {language === "es"
-                ? "Los correos del MVP quedan registrados internamente hasta que añadas credenciales SMTP reales en una siguiente fase."
-                : "For this MVP, outgoing emails are stored internally until real SMTP credentials are added later."}
+                ? "El acceso administrativo permanece protegido y las notificaciones por correo se gestionan desde la configuración del sistema."
+                : "Administrative access stays protected, and email notifications are managed from system settings."}
             </div>
           </CardContent>
         </Card>
@@ -1519,6 +1526,27 @@ const SettingsView = ({ settings, emailLogs, onSaveSettings, onUploadLogo, onUpl
             </select>
             <p className="mt-2 text-sm text-zinc-500">{t.currencyHelp}</p>
           </div>
+          <div className="md:col-span-2 rounded-2xl border border-white/10 bg-black/20 p-5" data-testid="smtp-settings-section">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-white">{t.smtpSettings}</p>
+              <Badge className={formState.smtp_password_configured ? "border-green-500/25 bg-green-500/10 text-green-200" : "border-yellow-500/25 bg-yellow-500/10 text-yellow-200"} data-testid="smtp-config-status-badge">
+                {formState.smtp_password_configured ? t.smtpConfigured : t.smtpNotConfigured}
+              </Badge>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Input data-testid="settings-smtp-host-input" onChange={(event) => update("smtp_host", event.target.value)} placeholder={t.smtpHost} value={formState.smtp_host || ""} />
+              <Input data-testid="settings-smtp-port-input" onChange={(event) => update("smtp_port", Number(event.target.value))} placeholder={t.smtpPort} type="number" value={formState.smtp_port || 587} />
+              <Input data-testid="settings-smtp-username-input" onChange={(event) => update("smtp_username", event.target.value)} placeholder={t.smtpUsername} value={formState.smtp_username || ""} />
+              <select className="h-11 rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="settings-smtp-tls-select" onChange={(event) => update("smtp_tls", event.target.value === "true")} value={String(formState.smtp_tls)}>
+                <option value="true">{t.yes}</option>
+                <option value="false">{t.no}</option>
+              </select>
+              <div className="md:col-span-2">
+                <Input data-testid="settings-smtp-password-input" onChange={(event) => update("smtp_password", event.target.value)} placeholder={formState.smtp_password_masked || "••••••••"} type="password" value={formState.smtp_password} />
+                <p className="mt-2 text-sm text-zinc-500">{t.smtpPasswordHelp}</p>
+              </div>
+            </div>
+          </div>
           <div className="md:col-span-2 grid gap-4 lg:grid-cols-2">
             <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-4">
               <label className="mb-3 block text-sm text-zinc-300">{t.uploadLogo}</label>
@@ -1693,7 +1721,11 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
 
   const saveSettings = async (payload) => {
     try {
-      await adminApi.updateSettings(session.token, payload);
+      const sanitizedPayload = { ...payload };
+      if (!sanitizedPayload.smtp_password) {
+        delete sanitizedPayload.smtp_password;
+      }
+      await adminApi.updateSettings(session.token, sanitizedPayload);
       toast.success(t.settingsSaved);
       await refreshAll();
       await refreshPublicData();
@@ -1783,7 +1815,7 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
               <h1 className="text-3xl text-white" data-testid="admin-page-title">{navigationItems.find((item) => item.key === currentSection)?.label}</h1>
             </div>
             <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-zinc-300" data-testid="admin-email-mode-pill">
-              {t.emailModeLabel}
+              {settings?.email_mode === "smtp" ? t.emailModeSmtp : t.emailModeInternal}
             </div>
           </header>
           {loading ? (
