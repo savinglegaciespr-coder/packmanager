@@ -161,6 +161,31 @@ const formatDisplayDate = (isoDate, language) => {
   }).format(dateValue);
 };
 
+const getBookingScheduleDates = (booking) => {
+  if (!booking?.start_week) {
+    return { intake_date: "", delivery_date: "" };
+  }
+
+  const intakeDate = booking.start_week;
+  const startDate = new Date(`${intakeDate}T00:00:00`);
+  if (Number.isNaN(startDate.getTime())) {
+    return { intake_date: intakeDate, delivery_date: "" };
+  }
+
+  const durationValue = Number(booking.duration_value || 0);
+  const totalDays = booking.duration_unit === "weeks" ? durationValue * 7 : durationValue;
+  if (!totalDays) {
+    return { intake_date: intakeDate, delivery_date: "" };
+  }
+
+  const deliveryDate = new Date(startDate);
+  deliveryDate.setDate(deliveryDate.getDate() + Math.max(totalDays - 1, 0));
+  return {
+    intake_date: intakeDate,
+    delivery_date: deliveryDate.toISOString().split("T")[0],
+  };
+};
+
 const parseDogDateInput = (value) => {
   if (!value) return "";
   const parsed = new Date(`${value}T00:00:00`);
@@ -809,8 +834,6 @@ const BookingDetailDialog = ({ booking, language, onClose, onSave, token, curren
         payment_status: booking.payment_status,
         vaccination_certificate_status: booking.vaccination_certificate_status,
         eligibility_status: booking.eligibility_status,
-        intake_date: booking.intake_date || "",
-        delivery_date: booking.delivery_date || "",
         internal_notes: booking.internal_notes || "",
         rejection_reason: booking.rejection_reason || "",
       });
@@ -819,11 +842,13 @@ const BookingDetailDialog = ({ booking, language, onClose, onSave, token, curren
 
   if (!booking || !formState) return null;
 
+  const scheduleDates = getBookingScheduleDates(booking);
+
   const saveChanges = async () => {
     await onSave(booking.id, {
       ...formState,
-      intake_date: formState.intake_date || null,
-      delivery_date: formState.delivery_date || null,
+      intake_date: scheduleDates.intake_date || null,
+      delivery_date: scheduleDates.delivery_date || null,
     });
     onClose();
   };
@@ -868,25 +893,45 @@ const BookingDetailDialog = ({ booking, language, onClose, onSave, token, curren
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            <select className="h-11 rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="booking-status-select" onChange={(event) => setFormState((current) => ({ ...current, status: event.target.value }))} value={formState.status}>
-              {STATUS_OPTIONS.map((option) => <option key={option} value={option}>{t.status[option] || option}</option>)}
-            </select>
-            <select className="h-11 rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="payment-status-select" onChange={(event) => setFormState((current) => ({ ...current, payment_status: event.target.value }))} value={formState.payment_status}>
-              {DOC_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{t.status[option] || option}</option>)}
-            </select>
-            <select className="h-11 rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="certificate-status-select" onChange={(event) => setFormState((current) => ({ ...current, vaccination_certificate_status: event.target.value }))} value={formState.vaccination_certificate_status}>
-              {DOC_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{t.status[option] || option}</option>)}
-            </select>
-            <select className="h-11 rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="eligibility-status-select" onChange={(event) => setFormState((current) => ({ ...current, eligibility_status: event.target.value }))} value={formState.eligibility_status}>
-              {ELIGIBILITY_OPTIONS.map((option) => <option key={option} value={option}>{t.status[option] || option}</option>)}
-            </select>
-            <Input data-testid="intake-date-input" onChange={(event) => setFormState((current) => ({ ...current, intake_date: event.target.value }))} type="date" value={formState.intake_date} />
-            <Input data-testid="delivery-date-input" onChange={(event) => setFormState((current) => ({ ...current, delivery_date: event.target.value }))} type="date" value={formState.delivery_date} />
-            <div className="md:col-span-2">
-              <Input data-testid="rejection-reason-input" onChange={(event) => setFormState((current) => ({ ...current, rejection_reason: event.target.value }))} placeholder="Rejection reason" value={formState.rejection_reason} />
+            <div>
+              <label className="mb-2 block text-sm text-zinc-300" data-testid="booking-status-label">{t.bookingStatusField}</label>
+              <select className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="booking-status-select" onChange={(event) => setFormState((current) => ({ ...current, status: event.target.value }))} value={formState.status}>
+                {STATUS_OPTIONS.map((option) => <option key={option} value={option}>{t.status[option] || option}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-2 block text-sm text-zinc-300" data-testid="payment-status-label">{t.paymentProofField}</label>
+              <select className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="payment-status-select" onChange={(event) => setFormState((current) => ({ ...current, payment_status: event.target.value }))} value={formState.payment_status}>
+                {DOC_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{t.status[option] || option}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-2 block text-sm text-zinc-300" data-testid="certificate-status-label">{t.vaccinationCertificateField}</label>
+              <select className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="certificate-status-select" onChange={(event) => setFormState((current) => ({ ...current, vaccination_certificate_status: event.target.value }))} value={formState.vaccination_certificate_status}>
+                {DOC_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{t.status[option] || option}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-2 block text-sm text-zinc-300" data-testid="eligibility-status-label">{t.dogEligibilityField}</label>
+              <select className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="eligibility-status-select" onChange={(event) => setFormState((current) => ({ ...current, eligibility_status: event.target.value }))} value={formState.eligibility_status}>
+                {ELIGIBILITY_OPTIONS.map((option) => <option key={option} value={option}>{t.status[option] || option}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-2 block text-sm text-zinc-300" data-testid="intake-date-label">{t.intakeDateField}</label>
+              <Input data-testid="intake-date-input" readOnly type="text" value={scheduleDates.intake_date} />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm text-zinc-300" data-testid="delivery-date-label">{t.deliveryDateField}</label>
+              <Input data-testid="delivery-date-input" readOnly type="text" value={scheduleDates.delivery_date} />
             </div>
             <div className="md:col-span-2">
-              <Textarea data-testid="internal-notes-textarea" onChange={(event) => setFormState((current) => ({ ...current, internal_notes: event.target.value }))} placeholder="Internal notes" value={formState.internal_notes} />
+              <label className="mb-2 block text-sm text-zinc-300" data-testid="rejection-reason-label">{t.rejectionReasonField}</label>
+              <Input data-testid="rejection-reason-input" onChange={(event) => setFormState((current) => ({ ...current, rejection_reason: event.target.value }))} placeholder={t.rejectionReasonField} value={formState.rejection_reason} />
+            </div>
+            <div className="md:col-span-2">
+              <label className="mb-2 block text-sm text-zinc-300" data-testid="internal-notes-label">{t.internalNotesField}</label>
+              <Textarea data-testid="internal-notes-textarea" onChange={(event) => setFormState((current) => ({ ...current, internal_notes: event.target.value }))} placeholder={t.internalNotesField} value={formState.internal_notes} />
             </div>
             <div className="dialog-actions-row md:col-span-2">
               <Button className="touch-button" data-testid="close-booking-dialog-button" onClick={onClose} type="button" variant="outline">{t.close}</Button>

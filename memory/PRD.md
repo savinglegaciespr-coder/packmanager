@@ -90,6 +90,7 @@ Core business rules:
 - Improved public mobile booking form usability by applying mobile-friendly input types (email/tel/number) and tightening the booking-page header spacing so the form content sits higher on small screens
 - Hid admin access controls from the public interface for non-authenticated visitors, while keeping the direct `/admin/login` route available and preserving existing authentication logic
 - Replaced internal email logging mode with real Gmail SMTP delivery, added masked SMTP settings in admin configuration, and verified real send flows for booking submission, admin notification, approval, and rejection
+- Clarified the reservation review modal with explicit field labels and automatic read-only intake/delivery dates derived from the booking’s selected week and stored program duration
 - Implemented FastAPI backend for public config, programs, weeks, booking submission, admin auth, dashboard, bookings, settings, logo upload, document access, and capacity management
 - Added weekly capacity engine with multi-week occupancy protection, override support, and 24-hour pending expiration logic
 - Added admin workspace with dashboard charts/metrics, bookings filters, detail dialog, document status controls, manual booking creation, programs management, capacity controls, settings, and email log view
