@@ -154,28 +154,16 @@ const formatDisplayDate = (isoDate, language) => {
   }).format(dateValue);
 };
 
-const parseDogDateInput = (value, language) => {
+const parseDogDateInput = (value) => {
   if (!value) return "";
-  const segments = value.split("/");
-  if (segments.length !== 3) return "";
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return "";
 
-  const [first, second, year] = segments.map((segment) => Number(segment));
-  if ([first, second, year].some((part) => Number.isNaN(part))) return "";
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (parsed > today) return "";
 
-  const day = language === "es" ? first : second;
-  const month = language === "es" ? second : first;
-  if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900) return "";
-
-  const parsed = new Date(year, month - 1, day);
-  if (
-    parsed.getFullYear() !== year ||
-    parsed.getMonth() !== month - 1 ||
-    parsed.getDate() !== day
-  ) {
-    return "";
-  }
-
-  return `${year.toString().padStart(4, "0")}-${month.toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`;
+  return value;
 };
 
 const getStatusStyles = (status) => {
@@ -473,7 +461,8 @@ const BookingPage = ({ config, programs, language, setLanguage }) => {
     vaccination_certificate: null,
   });
 
-  const normalizedDogBirthDate = useMemo(() => parseDogDateInput(formState.date_of_birth_input, language), [formState.date_of_birth_input, language]);
+  const maxDogBirthDate = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const normalizedDogBirthDate = useMemo(() => parseDogDateInput(formState.date_of_birth_input), [formState.date_of_birth_input]);
   const computedDogAge = useMemo(() => calculateDogAge(normalizedDogBirthDate, language), [normalizedDogBirthDate, language]);
 
   const selectedProgram = useMemo(() => programs.find((program) => program.id === selectedProgramId), [programs, selectedProgramId]);
@@ -685,7 +674,7 @@ const BookingPage = ({ config, programs, language, setLanguage }) => {
                 <Input data-testid="dog-weight-input" onChange={(event) => updateField("weight", event.target.value)} placeholder={t.weight} required value={formState.weight} />
                 <div>
                   <label className="mb-2 block text-sm text-zinc-300" data-testid="dog-dob-label">{t.dob}</label>
-                  <Input data-testid="dog-dob-input" inputMode="numeric" onChange={(event) => updateField("date_of_birth_input", event.target.value)} placeholder={t.dateInputPlaceholder} required type="text" value={formState.date_of_birth_input} />
+                  <Input data-testid="dog-dob-input" max={maxDogBirthDate} onChange={(event) => updateField("date_of_birth_input", event.target.value)} required type="date" value={formState.date_of_birth_input} />
                   <p className="mt-2 text-sm text-zinc-400" data-testid="dog-age-display">
                     {t.automaticAge}: <span className="text-zinc-200">{computedDogAge || t.agePending}</span>
                   </p>
