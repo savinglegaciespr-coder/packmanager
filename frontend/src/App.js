@@ -89,6 +89,8 @@ const formatCurrency = (value, _language, currencyCode = "USD") => {
   return `${symbols[currencyCode] || "$"}${amountText}`;
 };
 
+const isValidEmailAddress = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+
 const normalizeLandingContent = (landingContent = {}) => ({
   hero_description_es: landingContent?.hero_description_es || "",
   hero_description_en: landingContent?.hero_description_en || "",
@@ -525,6 +527,7 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
     locale: language,
     owner_full_name: "",
     owner_email: "",
+    confirm_email: "",
     owner_phone: "",
     owner_address: "",
     dog_name: "",
@@ -545,6 +548,14 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
   const maxDogBirthDate = useMemo(() => new Date().toISOString().split("T")[0], []);
   const normalizedDogBirthDate = useMemo(() => parseDogDateInput(formState.date_of_birth_input), [formState.date_of_birth_input]);
   const computedDogAge = useMemo(() => calculateDogAge(normalizedDogBirthDate, language), [normalizedDogBirthDate, language]);
+  const emailValidationMessage = useMemo(() => {
+    if (!formState.owner_email) return "";
+    if (!isValidEmailAddress(formState.owner_email)) return t.invalidEmailAddress;
+    if (formState.confirm_email && formState.owner_email.trim().toLowerCase() !== formState.confirm_email.trim().toLowerCase()) {
+      return t.emailMismatch;
+    }
+    return "";
+  }, [formState.confirm_email, formState.owner_email, t.emailMismatch, t.invalidEmailAddress]);
 
   const selectedProgram = useMemo(() => programs.find((program) => program.id === selectedProgramId), [programs, selectedProgramId]);
   const calendarMonths = useMemo(() => buildReservationCalendarMonths(weeks), [weeks]);
@@ -591,6 +602,10 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
       toast.error(language === "es" ? "Selecciona una semana." : "Please select a week.");
       return;
     }
+    if (!formState.confirm_email || emailValidationMessage) {
+      toast.error(emailValidationMessage || t.emailMismatch);
+      return;
+    }
     if (!normalizedDogBirthDate) {
       toast.error(t.invalidDogBirthDate);
       return;
@@ -604,7 +619,7 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
       const payload = new FormData();
       payload.append("program_id", selectedProgramId);
       Object.entries(formState).forEach(([key, value]) => {
-        if (value !== null && value !== undefined) {
+        if (key !== "confirm_email" && value !== null && value !== undefined) {
           payload.append(key, value);
         }
       });
@@ -618,6 +633,7 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
         ...current,
         owner_full_name: "",
         owner_email: "",
+        confirm_email: "",
         owner_phone: "",
         owner_address: "",
         dog_name: "",
@@ -798,8 +814,14 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
                 </div>
                 <Input data-testid="owner-full-name-input" onChange={(event) => updateField("owner_full_name", event.target.value)} placeholder={t.fullName} required value={formState.owner_full_name} />
                 <Input data-testid="owner-email-input" onChange={(event) => updateField("owner_email", event.target.value)} placeholder={t.email} required type="email" value={formState.owner_email} />
+                <Input data-testid="owner-confirm-email-input" onChange={(event) => updateField("confirm_email", event.target.value)} placeholder={t.confirmEmail} required type="email" value={formState.confirm_email} />
                 <Input data-testid="owner-phone-input" onChange={(event) => updateField("owner_phone", event.target.value)} placeholder={t.phone} required type="tel" value={formState.owner_phone} />
                 <Input data-testid="owner-address-input" onChange={(event) => updateField("owner_address", event.target.value)} placeholder={t.address} required value={formState.owner_address} />
+                {emailValidationMessage && (
+                  <p className="md:col-span-2 text-sm text-red-300" data-testid="owner-email-validation-message">
+                    {emailValidationMessage}
+                  </p>
+                )}
               </section>
               <section className="grid gap-4 md:grid-cols-2">
                 <div className="md:col-span-2">
