@@ -161,6 +161,51 @@ const formatDisplayDate = (isoDate, language) => {
   }).format(dateValue);
 };
 
+const formatMonthLabel = (dateValue, language) =>
+  new Intl.DateTimeFormat(language === "es" ? "es-ES" : "en-US", {
+    month: "long",
+    year: "numeric",
+  }).format(dateValue);
+
+const buildReservationCalendarMonths = (weeks) => {
+  const orderedWeeks = [...weeks].sort((left, right) => left.week_start.localeCompare(right.week_start));
+  const monthMap = new Map();
+
+  orderedWeeks.forEach((week) => {
+    const dateValue = new Date(`${week.week_start}T00:00:00`);
+    const monthKey = `${dateValue.getFullYear()}-${String(dateValue.getMonth() + 1).padStart(2, "0")}`;
+    if (!monthMap.has(monthKey)) {
+      monthMap.set(monthKey, { monthDate: new Date(dateValue.getFullYear(), dateValue.getMonth(), 1), weeks: [] });
+    }
+    monthMap.get(monthKey).weeks.push(week);
+  });
+
+  return Array.from(monthMap.values()).map(({ monthDate, weeks: monthWeeks }) => {
+    const weekLookup = new Map(monthWeeks.map((week) => [week.week_start, week]));
+    const firstDayIndex = (monthDate.getDay() + 6) % 7;
+    const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
+    const totalCells = Math.ceil((firstDayIndex + daysInMonth) / 7) * 7;
+    const cells = Array.from({ length: totalCells }, (_, index) => {
+      const dayNumber = index - firstDayIndex + 1;
+      if (dayNumber < 1 || dayNumber > daysInMonth) {
+        return { id: `empty-${monthDate.toISOString()}-${index}`, isCurrentMonth: false, iso: null, week: null, dayNumber: null };
+      }
+
+      const cellDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), dayNumber);
+      const iso = `${cellDate.getFullYear()}-${String(cellDate.getMonth() + 1).padStart(2, "0")}-${String(cellDate.getDate()).padStart(2, "0")}`;
+      return {
+        id: iso,
+        isCurrentMonth: true,
+        iso,
+        week: weekLookup.get(iso) || null,
+        dayNumber,
+      };
+    });
+
+    return { monthDate, cells };
+  });
+};
+
 const getBookingScheduleDates = (booking) => {
   if (!booking?.start_week) {
     return { intake_date: "", delivery_date: "" };
@@ -502,6 +547,7 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
   const computedDogAge = useMemo(() => calculateDogAge(normalizedDogBirthDate, language), [normalizedDogBirthDate, language]);
 
   const selectedProgram = useMemo(() => programs.find((program) => program.id === selectedProgramId), [programs, selectedProgramId]);
+  const calendarMonths = useMemo(() => buildReservationCalendarMonths(weeks), [weeks]);
 
   const loadWeeks = useCallback(async () => {
     if (!selectedProgramId) return;
@@ -643,30 +689,88 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
                 <label className="text-sm text-zinc-300">{t.selectWeek}</label>
                 {loadingWeeks && <span className="text-xs text-zinc-500">{t.loadingWeeks}</span>}
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {weeks.map((week) => (
-                  <button
-                    className={`week-card rounded-2xl border p-4 text-left ${formState.start_week === week.week_start ? "border-red-500 bg-red-500/10" : "border-white/10 bg-white/5"}`}
-                    data-testid={`week-card-${week.week_start}`}
-                    disabled={week.remaining === 0}
-                    key={week.week_start}
-                    onClick={() => updateField("start_week", week.week_start)}
-                    type="button"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-white">{formatDisplayDate(week.week_start, language)}</p>
-                        <p className="mt-1 text-xs text-zinc-500">{week.week_start}</p>
+              <div className="rounded-[1.75rem] border border-white/10 bg-black/20 p-4 md:p-5" data-testid="reservation-calendar-panel">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-white">{t.reservationCalendar}</p>
+                    <p className="mt-1 text-xs text-zinc-500">{t.selectWeek}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-300" data-testid="reservation-calendar-legend">
+                    <span className="rounded-full border border-green-500/25 bg-green-500/10 px-3 py-1 text-green-200">{t.status.available}</span>
+                    <span className="rounded-full border border-yellow-500/25 bg-yellow-500/10 px-3 py-1 text-yellow-200">{t.status.almost_full}</span>
+                    <span className="rounded-full border border-red-500/25 bg-red-500/10 px-3 py-1 text-red-200">{t.status.full}</span>
+                  </div>
+                </div>
+                <div className="grid gap-4 xl:grid-cols-2">
+                  {calendarMonths.map((month) => (
+                    <div className="rounded-2xl border border-white/10 bg-zinc-950/70 p-3" data-testid={`calendar-month-${month.monthDate.toISOString().slice(0, 7)}`} key={month.monthDate.toISOString()}>
+                      <p className="mb-3 text-sm font-semibold capitalize text-white">{formatMonthLabel(month.monthDate, language)}</p>
+                      <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[11px] uppercase tracking-[0.16em] text-zinc-500">
+                        {t.weekdaysShort.map((day) => (
+                          <span key={`${month.monthDate.toISOString()}-${day}`}>{day}</span>
+                        ))}
                       </div>
-                      <Badge className={getStatusStyles(week.availability_label)} data-testid={`week-status-${week.week_start}`}>
-                        {t.status[week.availability_label]}
-                      </Badge>
+                      <div className="grid grid-cols-7 gap-1.5">
+                        {month.cells.map((cell) => {
+                          if (!cell.isCurrentMonth) {
+                            return <div className="aspect-square rounded-xl bg-transparent" key={cell.id} />;
+                          }
+
+                          if (!cell.week) {
+                            return (
+                              <div className="flex aspect-square items-start justify-end rounded-xl border border-white/5 bg-white/[0.02] p-2 text-xs text-zinc-600" key={cell.id}>
+                                {cell.dayNumber}
+                              </div>
+                            );
+                          }
+
+                          const availabilityClasses =
+                            cell.week.availability_label === "full"
+                              ? "border-red-500/30 bg-red-500/12 text-red-100"
+                              : cell.week.availability_label === "almost_full"
+                                ? "border-yellow-500/30 bg-yellow-500/12 text-yellow-100"
+                                : "border-green-500/30 bg-green-500/12 text-green-100";
+
+                          return (
+                            <button
+                              className={`flex aspect-square flex-col items-start justify-between rounded-xl border p-2 text-left transition-transform duration-200 hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-80 ${availabilityClasses} ${formState.start_week === cell.week.week_start ? "ring-2 ring-white/80" : ""}`}
+                              data-testid={`week-card-${cell.week.week_start}`}
+                              disabled={cell.week.remaining === 0}
+                              key={cell.id}
+                              onClick={() => updateField("start_week", cell.week.week_start)}
+                              type="button"
+                            >
+                              <span className="text-sm font-semibold">{cell.dayNumber}</span>
+                              <span className="text-[10px] leading-4">
+                                {cell.week.remaining} {t.spacesLeft}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <p className="mt-4 text-sm text-zinc-300" data-testid={`week-capacity-${week.week_start}`}>
-                      {week.remaining} / {week.capacity} {t.spotsAvailable}
-                    </p>
-                  </button>
-                ))}
+                  ))}
+                </div>
+                {formState.start_week && (() => {
+                  const selectedWeek = weeks.find((week) => week.week_start === formState.start_week);
+                  if (!selectedWeek) return null;
+                  return (
+                    <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4" data-testid="selected-week-summary">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-white">{formatDisplayDate(selectedWeek.week_start, language)}</p>
+                          <p className="mt-1 text-xs text-zinc-500">{selectedWeek.week_start}</p>
+                        </div>
+                        <Badge className={getStatusStyles(selectedWeek.availability_label)} data-testid={`week-status-${selectedWeek.week_start}`}>
+                          {t.status[selectedWeek.availability_label]}
+                        </Badge>
+                      </div>
+                      <p className="mt-3 text-sm text-zinc-300" data-testid={`week-capacity-${selectedWeek.week_start}`}>
+                        {selectedWeek.remaining} / {selectedWeek.capacity} {t.spotsAvailable}
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
             {bookingResult && (
