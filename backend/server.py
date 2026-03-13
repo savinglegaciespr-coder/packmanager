@@ -286,10 +286,10 @@ def default_landing_content() -> Dict[str, Any]:
             },
             {
                 "id": "email-mode",
-                "title_es": "Notificaciones por email",
+                "title_es": "Notificaciones automáticas",
                 "title_en": "Email notifications",
-                "description_es": "Correos de reserva, aprobación y rechazo registrados internamente para control operativo.",
-                "description_en": "Booking, approval, and rejection emails are logged internally for operational control.",
+                "description_es": "Correos reales por Gmail SMTP para reservas nuevas, aprobaciones y rechazos.",
+                "description_en": "Real Gmail SMTP delivery for new bookings, approvals, and rejections.",
             },
         ],
     }
