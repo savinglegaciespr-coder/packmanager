@@ -179,20 +179,20 @@ const getStatusStyles = (status) => {
   return "border-zinc-700 bg-zinc-800/80 text-zinc-200";
 };
 
-const BrandMark = ({ config }) => (
+const BrandMark = ({ compact = false, config }) => (
   <div className="flex items-center gap-3" data-testid="brand-mark">
-    <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+    <div className={`flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 ${compact ? "h-9 w-9 md:h-11 md:w-11" : "h-11 w-11"}`}>
       {config?.logo_url ? (
-        <img alt={config.business_name} className="h-8 w-8 object-contain" src={config.logo_url} />
+        <img alt={config.business_name} className={`${compact ? "h-6 w-6 md:h-8 md:w-8" : "h-8 w-8"} object-contain`} src={config.logo_url} />
       ) : (
-        <PawPrint className="h-5 w-5 text-red-500" />
+        <PawPrint className={`${compact ? "h-4 w-4 md:h-5 md:w-5" : "h-5 w-5"} text-red-500`} />
       )}
     </div>
     <div>
-      <p className="font-heading text-sm font-semibold tracking-[0.25em] text-zinc-300" data-testid="brand-name">
+      <p className={`font-heading font-semibold tracking-[0.25em] text-zinc-300 ${compact ? "text-xs md:text-sm" : "text-sm"}`} data-testid="brand-name">
         {config?.business_name || "PAWS TRAINING"}
       </p>
-      <p className="text-xs text-zinc-500" data-testid="brand-slogan">
+      <p className={`${compact ? "hidden text-[11px] md:block" : "text-xs"} text-zinc-500`} data-testid="brand-slogan">
         {config?.slogan || "BY PET LOVERS SITTING"}
       </p>
     </div>
@@ -262,19 +262,19 @@ const MeasuredChart = ({ children, className = "h-[320px]" }) => {
   );
 };
 
-const PublicHeader = ({ config, language, setLanguage, t }) => (
-  <header className="section-shell sticky top-0 z-40 pt-6">
-    <div className="surface-panel flex flex-wrap items-center justify-between gap-4 rounded-3xl px-5 py-4 backdrop-blur">
-      <BrandMark config={config} />
-      <div className="flex flex-wrap items-center gap-3">
-        <nav className="flex items-center gap-2 text-sm text-zinc-300">
-          <Link className="rounded-full px-4 py-2 transition-colors hover:bg-white/5" data-testid="nav-home-link" to="/">
+const PublicHeader = ({ compact = false, config, language, setLanguage, t }) => (
+  <header className={`section-shell sticky top-0 z-40 ${compact ? "pt-2 md:pt-6" : "pt-6"}`}>
+    <div className={`surface-panel flex flex-wrap items-center justify-between rounded-3xl backdrop-blur ${compact ? "gap-2 px-3 py-2 md:gap-3 md:px-5 md:py-4" : "gap-4 px-5 py-4"}`}>
+      <BrandMark compact={compact} config={config} />
+      <div className={`flex items-center gap-2 ${compact ? "w-full justify-between md:w-auto md:flex-wrap md:justify-normal md:gap-3" : "flex-wrap gap-3"}`}>
+        <nav className={`flex items-center text-zinc-300 ${compact ? "gap-1 text-xs md:gap-2 md:text-sm" : "gap-2 text-sm"}`}>
+          <Link className={`rounded-full transition-colors hover:bg-white/5 ${compact ? "px-2.5 py-1.5 md:px-4 md:py-2" : "px-4 py-2"}`} data-testid="nav-home-link" to="/">
             {t.home}
           </Link>
-          <Link className="rounded-full px-4 py-2 transition-colors hover:bg-white/5" data-testid="nav-book-link" to="/book">
+          <Link className={`rounded-full transition-colors hover:bg-white/5 ${compact ? "px-2.5 py-1.5 md:px-4 md:py-2" : "px-4 py-2"}`} data-testid="nav-book-link" to="/book">
             {t.booking}
           </Link>
-          <Link className="rounded-full px-4 py-2 transition-colors hover:bg-white/5" data-testid="nav-admin-link" to="/admin/login">
+          <Link className={`rounded-full transition-colors hover:bg-white/5 ${compact ? "px-2.5 py-1.5 md:px-4 md:py-2" : "px-4 py-2"}`} data-testid="nav-admin-link" to="/admin/login">
             {t.admin}
           </Link>
         </nav>
@@ -291,7 +291,7 @@ const LandingPage = ({ config, programs, language, setLanguage }) => {
   const heroImageSrc = config?.landing_hero_image_url || HERO_IMAGE;
   return (
     <div className="app-shell" data-testid="landing-page">
-      <PublicHeader config={config} language={language} setLanguage={setLanguage} t={t} />
+      <PublicHeader compact config={config} language={language} setLanguage={setLanguage} t={t} />
       <main className="section-shell space-y-12 pb-12 pt-12 md:pt-16">
         <section className="hero-section grid lg:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)] lg:items-center">
           <div className="hero-copy-panel surface-panel reveal-up rounded-[2rem]">
@@ -561,7 +561,7 @@ const BookingPage = ({ config, programs, language, setLanguage }) => {
   return (
     <div className="app-shell" data-testid="booking-page">
       <PublicHeader config={config} language={language} setLanguage={setLanguage} t={t} />
-      <main className="section-shell grid gap-8 pb-12 pt-10 lg:grid-cols-[0.9fr_1.1fr]">
+      <main className="section-shell grid gap-8 pb-12 pt-6 md:pt-10 lg:grid-cols-[0.9fr_1.1fr]">
         <Card className="surface-panel h-fit rounded-[2rem] border-white/10">
           <CardHeader>
             <CardTitle className="text-3xl text-white" data-testid="booking-title">
@@ -658,7 +658,7 @@ const BookingPage = ({ config, programs, language, setLanguage }) => {
                 </div>
                 <Input data-testid="owner-full-name-input" onChange={(event) => updateField("owner_full_name", event.target.value)} placeholder={t.fullName} required value={formState.owner_full_name} />
                 <Input data-testid="owner-email-input" onChange={(event) => updateField("owner_email", event.target.value)} placeholder={t.email} required type="email" value={formState.owner_email} />
-                <Input data-testid="owner-phone-input" onChange={(event) => updateField("owner_phone", event.target.value)} placeholder={t.phone} required value={formState.owner_phone} />
+                <Input data-testid="owner-phone-input" onChange={(event) => updateField("owner_phone", event.target.value)} placeholder={t.phone} required type="tel" value={formState.owner_phone} />
                 <Input data-testid="owner-address-input" onChange={(event) => updateField("owner_address", event.target.value)} placeholder={t.address} required value={formState.owner_address} />
               </section>
               <section className="grid gap-4 md:grid-cols-2">
@@ -671,7 +671,7 @@ const BookingPage = ({ config, programs, language, setLanguage }) => {
                   <option value="Male">{t.male}</option>
                   <option value="Female">{t.female}</option>
                 </select>
-                <Input data-testid="dog-weight-input" onChange={(event) => updateField("weight", event.target.value)} placeholder={t.weight} required value={formState.weight} />
+                <Input data-testid="dog-weight-input" min="0" onChange={(event) => updateField("weight", event.target.value)} placeholder={t.weight} required step="0.1" type="number" value={formState.weight} />
                 <div>
                   <label className="mb-2 block text-sm text-zinc-300" data-testid="dog-dob-label">{t.dob}</label>
                   <Input data-testid="dog-dob-input" max={maxDogBirthDate} onChange={(event) => updateField("date_of_birth_input", event.target.value)} required type="date" value={formState.date_of_birth_input} />

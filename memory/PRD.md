@@ -87,6 +87,7 @@ Core business rules:
 - Removed demo admin credentials from the public login experience and from the public config response, while keeping the existing authentication system unchanged
 - Updated the dog birth date field in the public booking form to use a native mobile-friendly date picker with future dates blocked, while preserving the existing automatic age calculation behavior
 - Improved admin mobile responsiveness with a more usable small-screen layout, larger touch targets, and mobile-safe modal dialogs/action bars while preserving desktop behavior and business logic
+- Improved public mobile booking form usability by applying mobile-friendly input types (email/tel/number) and tightening the booking-page header spacing so the form content sits higher on small screens
 - Implemented FastAPI backend for public config, programs, weeks, booking submission, admin auth, dashboard, bookings, settings, logo upload, document access, and capacity management
 - Added weekly capacity engine with multi-week occupancy protection, override support, and 24-hour pending expiration logic
 - Added admin workspace with dashboard charts/metrics, bookings filters, detail dialog, document status controls, manual booking creation, programs management, capacity controls, settings, and email log view
