@@ -819,12 +819,12 @@ const BookingDetailDialog = ({ booking, language, onClose, onSave, token, curren
 
   return (
     <Dialog onOpenChange={(open) => !open && onClose()} open={Boolean(booking)}>
-      <DialogContent aria-describedby="booking-detail-description" className="max-w-4xl border-white/10 bg-zinc-950 text-white" data-testid="booking-detail-dialog">
+      <DialogContent aria-describedby="booking-detail-description" className="mobile-dialog-content max-w-4xl border-white/10 bg-zinc-950 text-white" data-testid="booking-detail-dialog">
         <DialogHeader>
           <DialogTitle>{booking.dog.name} · {booking.owner.full_name}</DialogTitle>
           <DialogDescription className="text-zinc-400" id="booking-detail-description">{booking.start_week} · {booking.program_name_es} · {booking.owner.email}</DialogDescription>
         </DialogHeader>
-        <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
+        <div className="mobile-dialog-grid grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
           <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-5">
             <div data-testid="booking-owner-summary">
               <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{t.ownerLabel}</p>
@@ -848,10 +848,10 @@ const BookingDetailDialog = ({ booking, language, onClose, onSave, token, curren
               ))}
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Button className="rounded-full" data-testid="open-payment-proof-button" onClick={() => openProtectedDocument(token, booking.id, "payment_proof")} type="button" variant="outline">
+              <Button className="touch-button rounded-full" data-testid="open-payment-proof-button" onClick={() => openProtectedDocument(token, booking.id, "payment_proof")} type="button" variant="outline">
                 <FileText className="mr-2 h-4 w-4" /> {t.paymentProof}
               </Button>
-              <Button className="rounded-full" data-testid="open-certificate-button" onClick={() => openProtectedDocument(token, booking.id, "vaccination_certificate")} type="button" variant="outline">
+              <Button className="touch-button rounded-full" data-testid="open-certificate-button" onClick={() => openProtectedDocument(token, booking.id, "vaccination_certificate")} type="button" variant="outline">
                 <ShieldCheck className="mr-2 h-4 w-4" /> {t.vaccinationCertificate}
               </Button>
             </div>
@@ -877,9 +877,9 @@ const BookingDetailDialog = ({ booking, language, onClose, onSave, token, curren
             <div className="md:col-span-2">
               <Textarea data-testid="internal-notes-textarea" onChange={(event) => setFormState((current) => ({ ...current, internal_notes: event.target.value }))} placeholder="Internal notes" value={formState.internal_notes} />
             </div>
-            <div className="md:col-span-2 flex justify-end gap-3">
-              <Button data-testid="close-booking-dialog-button" onClick={onClose} type="button" variant="outline">{t.close}</Button>
-              <Button className="bg-primary text-white hover:bg-red-700" data-testid="save-booking-dialog-button" onClick={saveChanges} type="button">
+            <div className="dialog-actions-row md:col-span-2">
+              <Button className="touch-button" data-testid="close-booking-dialog-button" onClick={onClose} type="button" variant="outline">{t.close}</Button>
+              <Button className="touch-button bg-primary text-white hover:bg-red-700" data-testid="save-booking-dialog-button" onClick={saveChanges} type="button">
                 {t.saveChanges}
               </Button>
             </div>
@@ -939,7 +939,7 @@ const ManualBookingDialog = ({ open, onClose, programs, onCreate, language }) =>
 
   return (
     <Dialog onOpenChange={(visible) => !visible && onClose()} open={open}>
-      <DialogContent aria-describedby="manual-booking-description" className="max-w-3xl border-white/10 bg-zinc-950 text-white" data-testid="manual-booking-dialog">
+      <DialogContent aria-describedby="manual-booking-description" className="mobile-dialog-content max-w-3xl border-white/10 bg-zinc-950 text-white" data-testid="manual-booking-dialog">
         <DialogHeader>
           <DialogTitle>{t.manualBooking}</DialogTitle>
           <DialogDescription className="text-zinc-400" id="manual-booking-description">
@@ -948,7 +948,7 @@ const ManualBookingDialog = ({ open, onClose, programs, onCreate, language }) =>
               : "Create already-committed client bookings so occupancy reflects real operating conditions."}
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="mobile-dialog-grid grid gap-4 md:grid-cols-2">
           <select className="h-11 rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="manual-program-select" onChange={(event) => update("program_id", event.target.value)} value={formState.program_id}>
             {programs.map((program) => <option key={program.id} value={program.id}>{language === "es" ? program.name_es : program.name_en}</option>)}
           </select>
@@ -970,9 +970,9 @@ const ManualBookingDialog = ({ open, onClose, programs, onCreate, language }) =>
           <div className="md:col-span-2">
             <Textarea data-testid="manual-goals-textarea" onChange={(event) => update("behavior_goals", event.target.value)} placeholder={t.goals} value={formState.behavior_goals} />
           </div>
-          <div className="md:col-span-2 flex justify-end gap-3">
-            <Button data-testid="manual-booking-close-button" onClick={onClose} type="button" variant="outline">{t.close}</Button>
-            <Button className="bg-primary text-white hover:bg-red-700" data-testid="manual-booking-save-button" onClick={handleCreate} type="button">
+          <div className="dialog-actions-row md:col-span-2">
+            <Button className="touch-button" data-testid="manual-booking-close-button" onClick={onClose} type="button" variant="outline">{t.close}</Button>
+            <Button className="touch-button bg-primary text-white hover:bg-red-700" data-testid="manual-booking-save-button" onClick={handleCreate} type="button">
               {t.manualBooking}
             </Button>
           </div>
@@ -1115,7 +1115,7 @@ const BookingsView = ({ bookings, programs, token, language, onUpdateBooking, on
               <CardTitle className="text-white">{t.bookings}</CardTitle>
               <CardDescription className="text-zinc-400">{filteredBookings.length} {language === "es" ? "reservas visibles" : "visible bookings"}</CardDescription>
             </div>
-            <Button className="rounded-full bg-primary text-white hover:bg-red-700" data-testid="open-manual-booking-button" onClick={() => setManualOpen(true)} type="button">
+            <Button className="touch-button rounded-full bg-primary text-white hover:bg-red-700" data-testid="open-manual-booking-button" onClick={() => setManualOpen(true)} type="button">
               {t.manualBooking}
             </Button>
           </div>
@@ -1221,7 +1221,7 @@ const ProgramsView = ({ programs, language, onSaveProgram, currencyCode }) => {
                   <CardTitle className="text-white">{program.name_es}</CardTitle>
                   <CardDescription className="text-zinc-400">{program.name_en}</CardDescription>
                 </div>
-                <Button data-testid={`edit-program-button-${program.id}`} onClick={() => setEditingProgram(program)} type="button" variant="outline">{t.edit}</Button>
+                <Button className="touch-button" data-testid={`edit-program-button-${program.id}`} onClick={() => setEditingProgram(program)} type="button" variant="outline">{t.edit}</Button>
               </div>
             </CardHeader>
             <CardContent className="text-sm text-zinc-300">
@@ -1251,8 +1251,8 @@ const ProgramsView = ({ programs, language, onSaveProgram, currencyCode }) => {
             <option value="false">{t.inactive}</option>
           </select>
           <div className="md:col-span-2 flex justify-end gap-3">
-            {editingProgram && <Button data-testid="cancel-program-edit-button" onClick={() => setEditingProgram(null)} type="button" variant="outline">{t.close}</Button>}
-            <Button className="bg-primary text-white hover:bg-red-700" data-testid="save-program-button" onClick={() => onSaveProgram(editingProgram?.id, formState).then(() => setEditingProgram(null))} type="button">
+            {editingProgram && <Button className="touch-button" data-testid="cancel-program-edit-button" onClick={() => setEditingProgram(null)} type="button" variant="outline">{t.close}</Button>}
+            <Button className="touch-button bg-primary text-white hover:bg-red-700" data-testid="save-program-button" onClick={() => onSaveProgram(editingProgram?.id, formState).then(() => setEditingProgram(null))} type="button">
               {t.saveProgram}
             </Button>
           </div>
@@ -1279,7 +1279,7 @@ const CapacityView = ({ capacityWeeks, language, onSaveCapacity }) => {
               <p className="text-sm text-zinc-500">{week.occupied} {t.occupiedLabel} · {week.remaining} {t.remainingLabel}</p>
             </div>
             <Input data-testid={`capacity-input-${week.week_start}`} onChange={(event) => setDrafts((current) => ({ ...current, [week.week_start]: event.target.value }))} type="number" value={drafts[week.week_start] ?? week.capacity} />
-            <Button className="rounded-full bg-primary text-white hover:bg-red-700" data-testid={`capacity-save-${week.week_start}`} onClick={() => onSaveCapacity(week.week_start, Number(drafts[week.week_start] ?? week.capacity))} type="button">
+            <Button className="touch-button rounded-full bg-primary text-white hover:bg-red-700" data-testid={`capacity-save-${week.week_start}`} onClick={() => onSaveCapacity(week.week_start, Number(drafts[week.week_start] ?? week.capacity))} type="button">
               {t.saveWeek}
             </Button>
           </div>
@@ -1553,7 +1553,7 @@ const SettingsView = ({ settings, emailLogs, onSaveSettings, onUploadLogo, onUpl
             </div>
           </div>
           <div className="md:col-span-2 flex justify-end">
-            <Button className="bg-primary text-white hover:bg-red-700" data-testid="settings-save-button" onClick={() => onSaveSettings(formState)} type="button">
+            <Button className="touch-button bg-primary text-white hover:bg-red-700" data-testid="settings-save-button" onClick={() => onSaveSettings(formState)} type="button">
               {t.saveSettings}
             </Button>
           </div>
@@ -1744,14 +1744,14 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
   return (
     <div className="app-shell section-shell pb-12 pt-10" data-testid="admin-shell">
       <div className="dashboard-layout">
-        <aside className="surface-panel h-fit rounded-[2rem] p-5">
+        <aside className="admin-sidebar surface-panel h-fit rounded-[2rem] p-5">
           <div className="flex items-center justify-between gap-3">
             <BrandMark config={config} />
           </div>
           <div className="mt-6">
             <LanguageToggle language={language} setLanguage={setLanguage} />
           </div>
-          <nav className="mt-6 grid gap-2">
+          <nav className="admin-nav-grid mt-6">
             {navigationItems.map((item) => {
               const Icon = item.icon;
               return (
@@ -1767,13 +1767,13 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
               <p className="text-sm font-semibold text-white">{session.admin?.name}</p>
               <p className="text-xs text-zinc-500">{session.admin?.email}</p>
             </div>
-            <Button className="mt-4 w-full rounded-full" data-testid="admin-logout-button" onClick={onLogout} type="button" variant="outline">
+            <Button className="touch-button mt-4 w-full rounded-full" data-testid="admin-logout-button" onClick={onLogout} type="button" variant="outline">
               <LogOut className="mr-2 h-4 w-4" /> {t.logout}
             </Button>
           </div>
         </aside>
-        <div className="grid gap-6">
-          <header className="surface-panel flex flex-wrap items-center justify-between gap-4 rounded-[2rem] p-6">
+        <div className="admin-main-column grid gap-6">
+          <header className="admin-topbar surface-panel flex flex-wrap items-center justify-between gap-4 rounded-[2rem] p-6">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">PAWS TRAINING</p>
               <h1 className="text-3xl text-white" data-testid="admin-page-title">{navigationItems.find((item) => item.key === currentSection)?.label}</h1>
