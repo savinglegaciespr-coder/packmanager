@@ -262,7 +262,7 @@ const MeasuredChart = ({ children, className = "h-[320px]" }) => {
   );
 };
 
-const PublicHeader = ({ compact = false, config, language, setLanguage, t }) => (
+const PublicHeader = ({ compact = false, config, language, setLanguage, showAdminAccess = false, t }) => (
   <header className={`section-shell sticky top-0 z-40 ${compact ? "pt-2 md:pt-6" : "pt-6"}`}>
     <div className={`surface-panel flex flex-wrap items-center justify-between rounded-3xl backdrop-blur ${compact ? "gap-2 px-3 py-2 md:gap-3 md:px-5 md:py-4" : "gap-4 px-5 py-4"}`}>
       <BrandMark compact={compact} config={config} />
@@ -274,9 +274,11 @@ const PublicHeader = ({ compact = false, config, language, setLanguage, t }) => 
           <Link className={`rounded-full transition-colors hover:bg-white/5 ${compact ? "px-2.5 py-1.5 md:px-4 md:py-2" : "px-4 py-2"}`} data-testid="nav-book-link" to="/book">
             {t.booking}
           </Link>
-          <Link className={`rounded-full transition-colors hover:bg-white/5 ${compact ? "px-2.5 py-1.5 md:px-4 md:py-2" : "px-4 py-2"}`} data-testid="nav-admin-link" to="/admin/login">
-            {t.admin}
-          </Link>
+          {showAdminAccess && (
+            <Link className={`rounded-full transition-colors hover:bg-white/5 ${compact ? "px-2.5 py-1.5 md:px-4 md:py-2" : "px-4 py-2"}`} data-testid="nav-admin-link" to="/admin/login">
+              {t.admin}
+            </Link>
+          )}
         </nav>
         <LanguageToggle language={language} setLanguage={setLanguage} />
       </div>
@@ -284,14 +286,14 @@ const PublicHeader = ({ compact = false, config, language, setLanguage, t }) => 
   </header>
 );
 
-const LandingPage = ({ config, programs, language, setLanguage }) => {
+const LandingPage = ({ config, programs, language, setLanguage, showAdminAccess }) => {
   const t = translations[language];
   const landingContent = normalizeLandingContent(config?.landing_content);
   const currencyCode = config?.currency || "USD";
   const heroImageSrc = config?.landing_hero_image_url || HERO_IMAGE;
   return (
     <div className="app-shell" data-testid="landing-page">
-      <PublicHeader compact config={config} language={language} setLanguage={setLanguage} t={t} />
+      <PublicHeader compact config={config} language={language} setLanguage={setLanguage} showAdminAccess={showAdminAccess} t={t} />
       <main className="section-shell space-y-12 pb-12 pt-12 md:pt-16">
         <section className="hero-section grid lg:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)] lg:items-center">
           <div className="hero-copy-panel surface-panel reveal-up rounded-[2rem]">
@@ -313,11 +315,13 @@ const LandingPage = ({ config, programs, language, setLanguage }) => {
                   {getLocalizedLandingText(landingContent, "reserve_button_label", language, t.reserveSpot)}
                 </Button>
               </Link>
-              <Link data-testid="hero-admin-link" to="/admin/login">
-                <Button className="hero-secondary-button rounded-full border border-white/10 bg-transparent text-white hover:bg-white/5" variant="outline">
-                  {getLocalizedLandingText(landingContent, "admin_button_label", language, t.adminLogin)}
-                </Button>
-              </Link>
+              {showAdminAccess && (
+                <Link data-testid="hero-admin-link" to="/admin/login">
+                  <Button className="hero-secondary-button rounded-full border border-white/10 bg-transparent text-white hover:bg-white/5" variant="outline">
+                    {getLocalizedLandingText(landingContent, "admin_button_label", language, t.adminLogin)}
+                  </Button>
+                </Link>
+              )}
             </div>
             <div className="hero-feature-grid">
               {landingContent.feature_cards.map((item) => (
@@ -432,7 +436,7 @@ const LandingPage = ({ config, programs, language, setLanguage }) => {
   );
 };
 
-const BookingPage = ({ config, programs, language, setLanguage }) => {
+const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess }) => {
   const t = translations[language];
   const currencyCode = config?.currency || "USD";
   const [selectedProgramId, setSelectedProgramId] = useState(programs[0]?.id || "");
@@ -560,7 +564,7 @@ const BookingPage = ({ config, programs, language, setLanguage }) => {
 
   return (
     <div className="app-shell" data-testid="booking-page">
-      <PublicHeader config={config} language={language} setLanguage={setLanguage} t={t} />
+      <PublicHeader config={config} language={language} setLanguage={setLanguage} showAdminAccess={showAdminAccess} t={t} />
       <main className="section-shell grid gap-8 pb-12 pt-6 md:pt-10 lg:grid-cols-[0.9fr_1.1fr]">
         <Card className="surface-panel h-fit rounded-[2rem] border-white/10">
           <CardHeader>
@@ -712,7 +716,7 @@ const BookingPage = ({ config, programs, language, setLanguage }) => {
   );
 };
 
-const AdminLoginPage = ({ config, language, setLanguage, onLogin }) => {
+const AdminLoginPage = ({ config, language, setLanguage, onLogin, showAdminAccess }) => {
   const t = translations[language];
   const navigate = useNavigate();
   const [formState, setFormState] = useState({
@@ -736,7 +740,7 @@ const AdminLoginPage = ({ config, language, setLanguage, onLogin }) => {
 
   return (
     <div className="app-shell" data-testid="admin-login-page">
-      <PublicHeader config={config} language={language} setLanguage={setLanguage} t={t} />
+      <PublicHeader config={config} language={language} setLanguage={setLanguage} showAdminAccess={showAdminAccess} t={t} />
       <main className="section-shell grid gap-8 pt-14 lg:grid-cols-[0.8fr_1fr]">
         <Card className="surface-panel rounded-[2rem] border-white/10">
           <CardHeader>
@@ -1830,6 +1834,7 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
 };
 
 const AppRoutes = ({ publicState, session, setSession, language, setLanguage, refreshPublicData }) => {
+  const showAdminAccess = Boolean(session?.token);
   const handleLogin = async (credentials) => {
     const response = await adminApi.login(credentials);
     const nextSession = { token: response.token, admin: response.admin };
@@ -1845,9 +1850,9 @@ const AppRoutes = ({ publicState, session, setSession, language, setLanguage, re
 
   return (
     <Routes>
-      <Route path="/" element={<LandingPage config={publicState.config} language={language} programs={publicState.programs} setLanguage={setLanguage} />} />
-      <Route path="/book" element={<BookingPage config={publicState.config} language={language} programs={publicState.programs} setLanguage={setLanguage} />} />
-      <Route path="/admin/login" element={<AdminLoginPage config={publicState.config} language={language} onLogin={handleLogin} setLanguage={setLanguage} />} />
+      <Route path="/" element={<LandingPage config={publicState.config} language={language} programs={publicState.programs} setLanguage={setLanguage} showAdminAccess={showAdminAccess} />} />
+      <Route path="/book" element={<BookingPage config={publicState.config} language={language} programs={publicState.programs} setLanguage={setLanguage} showAdminAccess={showAdminAccess} />} />
+      <Route path="/admin/login" element={<AdminLoginPage config={publicState.config} language={language} onLogin={handleLogin} setLanguage={setLanguage} showAdminAccess={showAdminAccess} />} />
       <Route
         path="/admin/*"
         element={
