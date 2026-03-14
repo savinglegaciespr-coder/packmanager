@@ -134,6 +134,19 @@ Core business rules:
 - Bilingual translations (ES/EN) for all new labels
 - Testing agent: 100% pass (13/13 backend, all frontend verified)
 
+### 2026-03-14 (deposit-first flow)
+- Implemented deposit-first booking flow: clients submit only deposit proof during booking
+- Added final_payment_token (secrets.token_urlsafe) to every booking for secure link access
+- New public endpoints: GET /api/public/booking-payment/{token} (booking summary), POST .../upload (final payment proof)
+- When admin verifies deposit (payment_status → Verified), system sends email with secure /payment/{token} link
+- Client opens link → sees booking summary (owner, dog, program, deposit ✓, remaining balance) + upload form
+- Upload guards: blocks if deposit not verified, blocks re-upload if already submitted
+- Admin notification email sent when client uploads final payment proof
+- New FinalPaymentPage component with bilingual support (ES/EN), error handling for invalid tokens
+- Route: /payment/:token — public, no auth required
+- FRONTEND_URL env var added for email link generation
+- Testing agent: 100% pass (10/10 backend, all frontend verified)
+
 ## Prioritized Backlog
 1. Add richer chart drill-downs and exportable reporting
 2. Split large frontend file into smaller modules for maintainability
