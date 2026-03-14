@@ -446,7 +446,7 @@ class TestEmailContainsCorrectPaymentLink:
         email_body = deposit_emails[0].get("body", "")
         
         # Verify email contains frontend URL with payment link
-        frontend_url = os.environ.get("FRONTEND_URL", "https://dog-training-app-7.preview.emergentagent.com")
+        frontend_url = os.environ.get("FRONTEND_URL", "https://paws-doc-viewer.preview.emergentagent.com")
         expected_link = f"{frontend_url}/payment/{token}"
         
         assert expected_link in email_body or f"/payment/{token}" in email_body, \

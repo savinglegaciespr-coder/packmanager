@@ -13,99 +13,72 @@ Build a full-stack private web application for a dog training business called PA
 - Premium, modern, responsive design.
 - Bilingual: Spanish (default) and English.
 
-**App Structure:**
-- Public landing page + booking form.
-- Private admin area with login.
-- Reusable business configuration layer (name, logo, colors, etc.).
-
-**Key Feature Requests Added During Development:**
-- **UI/UX:**
-    - Configurable landing page content and hero image.
-    - Improved hero section layout.
-    - Calendar-based UI for booking week selection.
-    - Improved mobile responsiveness for admin and booking forms.
-    - Specific input types (, , Sat Mar 14 04:08:50 UTC 2026) for better mobile UX.
-- **Admin Functionality:**
-    - Currency configuration (USD, EUR, GBP).
-    - An operational weekly view showing dogs per week.
-    - A TV-optimized Operations Screen with no financial data.
-    - Detailed weekly capacity view (Confirmed, Pending, Available).
-    - Manual booking modal improvements (auto-calculated age/dates, capacity checks).
-- **Security & Reliability:**
-    - Removed demo credentials from the login page.
-    - Hid the Admin Access button from public users.
-    - Added email confirmation field in the booking form.
-    - Real Gmail SMTP integration for email notifications.
-    - Data cleanup script to prepare for a real launch on April 13, 2026.
+**Key Feature Requests Implemented:**
+- Configurable landing page, hero image, and currency.
+- Calendar-based booking UI.
+- Multiple admin views: Dashboard, Reservations, Programs, Weekly Capacity, Operations Screen.
+- **Two-stage Payments:** Implemented a full deposit and final payment system.
+- **Configurable Deposits:** Admins can set fixed or percentage-based deposits per program.
+- **Client Payment Portal:** Clients receive a secure link via email to upload their final payment proof.
+- **Financial Dashboard:** Enhanced dashboard with detailed financial breakdowns (deposits, final payments, outstanding balance).
+- **Policy Enforcement:** Added a non-refundable deposit policy notice to emails and a mandatory acceptance checkbox on the booking form.
+- **Mobile File Upload Fix:** Implemented HEIC to JPG conversion for mobile uploads and created an image preview modal for admins.
+- **Advanced Document Viewer:** A rich modal for admins to preview documents with image zoom/pan and PDF embedding capabilities.
 
 **User's preferred language**: The user communicates in both **Spanish** and **English**. The application is bilingual. The next agent MUST be able to understand and respond in both languages.
 
 **what currently exists?**
-A comprehensive, full-stack application for PAWS TRAINING. The app features a public-facing landing page and a booking system, along with a secure, feature-rich admin panel.
-
-- **Frontend (React):** A bilingual (ES/EN) interface with a public landing page, a multi-step booking form with a visual calendar, and an extensive admin area. The admin panel includes a dashboard with metrics, views for reservations, programs, weekly capacity, an operational screen, and a settings page.
-- **Backend (FastAPI):** Manages all business logic, including user authentication (JWT), booking management, program configuration, settings management, file uploads, and API endpoints for all frontend features.
-- **Database (MongoDB):** Stores all data for bookings, programs, users, and application settings.
-- **Integrations:** Gmail SMTP is configured for sending real-time email notifications, though it is currently not working.
+A feature-complete full-stack application for PAWS TRAINING. It includes a bilingual public landing page and a sophisticated booking system. The secure admin panel provides a comprehensive suite of tools for managing the business, including a dashboard with financial metrics, detailed reservation management, program configuration with custom deposit rules, and various operational views. The system is integrated with Gmail for automated email notifications and features a complete two-stage payment workflow, from initial deposit to final payment via a secure client portal.
 
 **Last working item**:
-- Last item agent was working: The agent was debugging the failure of email notifications for booking events (new booking, approval, rejection). Despite configuring Gmail SMTP credentials provided by the user, the emails are not being sent. The agent had started to investigate the backend email sending logic in .
+- Last item agent was working: The agent was implementing an improved document viewer for the admin panel. The goal was to replace the basic file link with a rich preview modal supporting image zoom/pan, PDF embedding, and fallback for unsupported file types. The agent implemented the frontend code for this feature in , creating a new  and updating the .
 - Status: IN PROGRESS
 - Agent Testing Done: N
-- Which testing method agent to use? backend testing agent. The agent should first add detailed logging to the email sending functions in . Then, trigger a booking via a  command or the UI to observe the backend logs for any errors from  or connection issues with the Gmail server.
+- Which testing method agent to use? frontend testing agent. The agent should first restart the services, take a smoke-test screenshot to ensure the app loads, and then call the testing agent to verify the new modal's functionality across different file types (images, PDFs) and its interactive features (zoom, open in new tab, download).
 - User Testing Done: N
 
 **All Pending/In progress Issue list**:
--   **Issue 1: Email notifications are not being sent for booking events. (P0)**
+-   **Issue 1: The improved admin document viewer is not tested and may be incomplete. (P0)**
 
 Issues Detail:
--   **Issue 1**: Fix email sending for booking events.
-    -   **Attempted fixes**: The agent successfully integrated the SMTP settings into the backend configuration, loading them from the database. It identified the relevant code blocks in  responsible for triggering emails. However, the debugging process was interrupted before the root cause was found.
+-   **Issue 1**: Complete and test the improved admin document viewer.
+    -   **Attempted fixes**: The agent wrote the code to replace the old preview system. This involved creating a new  component within , adding state management for it, and creating new document action buttons (Preview, Open, Download). New translation keys were also added.
     -   **Next debug checklist**:
-        1.  **Examine **:
-            -   Review the  utility function. Verify it correctly uses  with  on port  and enables .
-            -   Add comprehensive logging before and after the  call to trace the execution and capture any exceptions.
-        2.  **Verify Endpoint Logic**:
-            -   Check the API endpoints for creating a booking (), approving (), and rejecting ().
-            -   Ensure the  function is being called with the correct parameters (sender, recipient, subject, body).
-        3.  **Test Execution**:
-            -   Restart the backend server to ensure all changes are applied.
-            -   Create a new booking through the UI or with .
-            -   Check the backend logs ( and ) for the new log messages and any error stack traces from the SMTP library. Common issues could be authentication errors (invalid password), firewall blocking the port, or Google security settings blocking the login attempt.
-    -   **Why fix this issue and what will be achieved with the fix?**: This is a critical business function. Fixing it will enable automated communication with clients and administrators, which is essential for managing the booking workflow.
+        1.  Restart the frontend and backend services to ensure all changes are loaded.
+        2.  Take a screenshot of the admin reservations page to ensure the UI is not broken.
+        3.  Manually test the flow: Log in as an admin, navigate to a booking with documents, and click the new Preview button for an image and a PDF.
+        4.  Verify that the image preview modal opens with zoom/pan controls.
+        5.  Verify that the PDF preview modal opens with an embedded viewer.
+        6.  Verify the Open in new tab and Download buttons work as expected.
+        7.  Call the  to perform a thorough regression test of the document viewing functionality.
+    -   **Why fix this issue and what will be achieved with the fix?**: This is the last requested feature. Completing it will provide a professional and efficient way for admins to review client documents, which is a core part of the booking verification workflow.
     -   **Status**: IN PROGRESS
     -   **Is recurring issue?**: N
-    -   **Should Test frontend/backend/both after fix?**: Backend first to confirm email delivery, then a full end-to-end test from the frontend to ensure the entire flow works as expected.
+    -   **Should Test frontend/backend/both after fix?**: Frontend.
     -   **Blocked on other issue**: None
 
 **In progress Task List**:
-There are no other partially completed tasks. The current focus is on the bug fix above.
+-   **Task 1**: Implementing the improved admin document viewer.
+    -   **Where to resume**: The code has been written in . The next step is to restart services and begin testing.
+    -   **What will be achieved with this?**: A professional, usable document preview system for administrators.
+    -   **Status**: IN PROGRESS
+    -   **Should Test frontend/backend/both after fix?**: Frontend
+    -   **Blocked on something**: No
 
 **Upcoming and Future Tasks**
-There are no outstanding feature requests from the user. All tasks mentioned in the problem statement and subsequent messages have been implemented. The next step after fixing the email issue would be to await further user feedback or requests.
+There are no outstanding feature requests from the user. All planned work has been implemented. After completing the current task, the agent should ask the user for the next steps or new feature requests.
 
 **Completed work in this session**
-- **Core Application:** Built the initial MVP including a landing page, booking flow, and admin dashboard.
-- **Admin Panel Enhancements:**
-    - Created a settings page to configure business details, landing content, currency, and hero image.
-    - Implemented multiple admin views: Dashboard with charts, Reservations table, Weekly Operations view, and a large-format Operations Screen.
-    - Added management pages for Programs and Weekly Capacity.
-    - Implemented a modal for manual bookings with capacity checks and auto-calculated dates.
-    - Improved the reservation review modal with clear labels and read-only dates.
-- **Booking Flow & UX:**
-    - Replaced the week selection list with an interactive calendar UI showing availability.
-    - Improved mobile responsiveness of both the public booking form and the admin panel.
-    - Enhanced form usability with correct input types (, , Sat Mar 14 04:08:50 UTC 2026) and email confirmation.
-    - Updated the vaccination status field to a clear Sí/No selection.
-- **Security & Configuration:**
-    - Removed hardcoded demo credentials from the login page.
-    - Implemented logic to hide the admin login button from public view.
-    - Configured the backend to use Gmail SMTP for sending emails.
-- **Deployment Readiness:**
-    - Passed two health checks from the Deployer Agent after fixing initial warnings.
+- **Email Notification System Fix:** Debugged and successfully fixed the Gmail SMTP integration, ensuring reliable email delivery for all booking events (new, approved, rejected, deposit verified). Added asynchronous sending and better logging.
+- **Two-Stage Payment System:** Rearchitected the payment model to support separate deposit and final payments, including backend logic and UI updates in the admin panel.
+- **Configurable Program Deposits:** Implemented a feature allowing admins to set fixed-amount or percentage-based deposits for each training program.
+- **Client Final Payment Portal:** Created a secure, token-based public page where clients can upload their final payment proof after their deposit is verified.
+- **Financial Dashboard Overhaul:** Upgraded the admin dashboard with a detailed financial summary card (deposits, final payments, outstanding balance) and a monthly payment breakdown chart.
+- **Deposit Policy Enforcement:** Added a non-refundable policy notice to the deposit verification email and integrated a mandatory acceptance checkbox into the public booking form.
+- **Mobile File Upload & Preview Fix:** Added backend support to convert HEIC images to JPEG on upload and implemented a functional image preview modal in the admin UI.
 
 **Earlier issues found/mentioned but not fixed**
-None. All issues raised by the user were addressed in sequence.
+None.
 
 **Known issue recurrence from previous fork**
 N/A
@@ -114,86 +87,87 @@ N/A
 
 
 **Key Technical Concepts**
-- **Frontend:** React, Tailwind CSS, Shadcn/UI, i18next (for localization), Axios
+- **Frontend:** React, Tailwind CSS, Shadcn/UI, i18next, Axios, Recharts
 - **Backend:** FastAPI (Python), Pydantic
 - **Database:** MongoDB
 - **Authentication:** JWT (JSON Web Tokens)
-- **Email:** Gmail SMTP integration using Python's 
+- **Email:** Gmail SMTP ()
+- **Image Processing:** ,  for HEIC to JPEG conversion.
 
 **key DB schema**
--   **users**: , 
--   **programs**: , ,  (in days), , 
--   **bookings**: , , , , , , , , , , , , , , 
--   **settings**: A single document containing keys like , , , , , , , , , , and various  fields.
+-   **bookings**: , , , , , , ,  (Deposit Status), , , , , , , , .
+-   **programs**: , , ,  ('percentage' or 'fixed'), .
+-   **settings**: Single document with business config, SMTP credentials, and landing page content.
 
 **changes in tech stack**
-None. The stack has remained consistent.
+- Added backend dependencies: , , .
 
 **All files of reference**
--   ****: The monolithic backend file containing all API endpoints, database models (Pydantic), and business logic. It's the most critical file for backend work.
--   ****: Defines the application's routing structure and global layout.
--   ****: Contains the client-facing booking form and calendar logic.
--   ****: The main hub for the admin, displays key metrics.
--   ****: The component for viewing and managing all bookings.
--   ****: The UI for managing all application settings, including SMTP credentials.
--   ** and **: Manage the English/Spanish translations for the UI.
+-   ****: Monolithic backend file containing all new and modified logic for payments, deposits, and file handling.
+-   ****: Critical frontend file containing the  and the new, untested .
+-   ****: Contains the updated financial summary and charts.
+-   ****: Contains the public booking form with the deposit policy checkbox.
+-   ****: UI for configuring program-specific deposits.
+-   ****: Contains the routing and the component for the new client-facing final payment page.
+-   ****: Translation files updated with all new UI text.
 
 **Areas that need refactoring**:
-- **** has grown very large. For future maintainability, it would be beneficial to split the logic into multiple files (e.g., separate routers for bookings, programs, settings; a separate file for database models; a utility file for email). This is not an urgent requirement but a good practice for future development.
+- ****: This file is now extremely large and handles authentication, multiple CRUD APIs, business logic, email sending, and file processing. It should be broken down into a modern FastAPI structure with separate routers, models, and utility files.
+- ****: This file contains the  and the new . The dialog component itself is over 600 lines long and manages complex state. It should be refactored into smaller, more manageable sub-components (e.g., , ).
 
 **key api endpoints**
--   : Admin authentication.
--   : Manage application configuration.
--   : Manage training programs.
--   : List and create new bookings.
--   : Update a booking's details/status.
--   : Approve a booking.
--   : Reject a booking.
--   : Get weekly availability for the booking calendar.
--   : Get statistics for the admin dashboard.
--   : Handles file uploads for booking documents.
+-   : (Admin) Upload final payment proof.
+-   : (Public) Fetches booking details for the final payment page.
+-   : (Public) Client uploads final payment proof.
+-   : Serves documents for viewing, with corrected .
+-   : Returns enhanced dashboard metrics including financial breakdowns.
+-   : Updated to trigger deposit verification emails.
 
 **Critical Info for New Agent**
-- The immediate priority is to fix the email notification system. This is a blocker for core business operations.
-- The SMTP credentials are provided by the user and stored in the database via the admin settings page. They are:
-    - **Username:** 
-    - **Password:**  (This is a Gmail App Password)
-- The application is bilingual (Spanish/English). Any new UI text must be added to the translation files ( and ).
-- The agent must be careful not to introduce regressions. The application is complex and has many interconnected features that were built and refined over a long session.
+- Your immediate and only task is to complete the implementation of the advanced document viewer in the admin panel. The code is written but completely untested.
+- You must restart services, perform smoke tests, and use the testing agent to validate the feature's functionality before finishing.
+- Be aware that  and  are very large. Future work would benefit greatly from refactoring these files.
 
 **documents and test reports created in this job**
-No persistent documents or test reports were created and saved in the workspace.
+- **/app/memory/PRD.md**: Updated with all completed features.
+- **/app/test_reports/iteration_8.json**: Last successful test report for the HEIC file upload fix.
 
 **Last 10 User Messages and any pending HUMAN messages**
-10.  Fix email sending using the existing SMTP config. (In Progress)
-9.  Acknowledge and continue working on the existing project. (Done)
-8.  Add a breakdown of Confirmed/Pending/Available spaces to the weekly capacity view. (Done)
-7.  Prevent manual bookings from exceeding weekly capacity. (Done)
-6.  Fix the manual booking modal to auto-calculate dog age and delivery date. (Done)
-5.  Update the vaccination field to a Sí/No selection in all booking forms. (Done)
-4.  Add a Confirm Email field to the booking form for validation. (Done)
-3.  Replace the weekly selection list with a visual calendar UI. (Done)
-2.  Improve the reservation review modal with clear labels and read-only dates. (Done)
-1.  Configure Gmail SMTP for real email notifications. (Done, but led to the current bug)
+10.  Improve admin document viewer with a rich preview modal (zoom, PDF embed). (In Progress)
+9.  Fix mobile file upload previews, especially for HEIC files. (Done)
+8.  Add a required checkbox to the booking form to accept the non-refundable deposit policy. (Done)
+7.  Improve financial dashboard with deposit/balance totals and update deposit verification email with policy text. (Done)
+6.  Create a deposit-first booking flow where clients can upload final payment later via a secure link sent by email. (Done)
+5.  Add configurable (fixed/percentage) deposit settings to each training program. (Done)
+4.  Upgrade the payment structure to support a two-stage (deposit + final) payment system. (Done)
+3.  User confirmed to continue with the payment feature implementation. (Done)
+2.  User provided confirmation to start work. (Done)
+1.  Fix the email notification system which was not sending emails despite SMTP being configured. (Done)
 
 **Project Health Check:**
--   **Broken**: Email notification system.
+-   **Broken**: None.
 -   **Mocked**: None.
+-   **In Progress**: The Admin Document Preview Modal feature.
 
 **3rd Party Integrations**
--   **Gmail SMTP**: Used for sending transactional emails. Requires a user-provided email and an App Password.
+-   **Gmail SMTP**: For sending transactional emails.
+-   **Pillow & pyheif**: Python libraries for server-side HEIC to JPG image conversion.
 
 **Testing status**
--   **Testing agent used after significant changes**: NO
+-   **Testing agent used after significant changes**: YES (for all completed features)
 -   **Troubleshoot agent used after agent stuck in loop**: NO
 -   **Test files created**: []
--   **Known regressions**: The email notification system stopped functioning after the implementation of the Gmail SMTP feature.
+-   **Known regressions**: None.
 
 **Credentials to test flow:**
--   **Admin Login**: Credentials are not displayed on the UI anymore. The next agent should try the default  /  or inspect  for any hardcoded test values.
+-   **Admin Login**: Inspect  for credentials. The previous agent removed the hardcoded display. Default might be  / .
 -   **Gmail SMTP**:
     -   **Username**: 
     -   **Password**: 
 
 **What agent forgot to execute**
-The agent did not forget to execute a task but failed to complete the Configure Gmail SMTP task successfully. The implementation was added, but it's not functional, leaving the email system in a broken state that now requires debugging.</analysis>
+The agent did not complete the final step of the development workflow for the last feature. After writing all the code for the Improved Admin Document Viewer, it failed to:
+- Restart the services.
+- Perform any form of testing (screenshot, manual check, or testing agent).
+- Verify that the new feature works or that it didn't break existing functionality.
+The task is left in a half-finished, untested state.</analysis>

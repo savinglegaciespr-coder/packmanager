@@ -45,6 +45,12 @@ import {
   ShieldCheck,
   UploadCloud,
   X,
+  ZoomIn,
+  ZoomOut,
+  Maximize,
+  ExternalLink,
+  Download,
+  Eye,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1123,11 +1129,69 @@ const MetricCard = ({ title, value, subtitle, testId }) => (
   </Card>
 );
 
+const DocumentPreviewModal = ({ doc, onClose, language }) => {
+  const t = translations[language];
+  const [zoom, setZoom] = useState(1);
+  if (!doc) return null;
+  const openNewTab = () => window.open(doc.url, "_blank", "noopener,noreferrer");
+  const downloadFile = () => { const a = document.createElement("a"); a.href = doc.url; a.download = doc.filename; a.click(); };
+  return (
+    <div className="fixed inset-0 z-[200] flex flex-col bg-black/90" data-testid="doc-preview-overlay" onClick={onClose}>
+      <div className="flex items-center justify-between border-b border-white/10 bg-zinc-950 px-4 py-3" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-3">
+          <p className="text-sm font-medium text-white truncate max-w-[200px] sm:max-w-none">{doc.filename}</p>
+          <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-zinc-400">{doc.contentType}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {doc.type === "image" && (
+            <>
+              <button className="rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white" data-testid="zoom-out-btn" onClick={() => setZoom((z) => Math.max(0.25, z - 0.25))} title="Zoom out"><ZoomOut className="h-4 w-4" /></button>
+              <span className="w-12 text-center text-xs text-zinc-400">{Math.round(zoom * 100)}%</span>
+              <button className="rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white" data-testid="zoom-in-btn" onClick={() => setZoom((z) => Math.min(5, z + 0.25))} title="Zoom in"><ZoomIn className="h-4 w-4" /></button>
+              <button className="rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white" data-testid="fit-screen-btn" onClick={() => setZoom(1)} title="Fit to screen"><Maximize className="h-4 w-4" /></button>
+            </>
+          )}
+          <button className="rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white" data-testid="open-new-tab-btn" onClick={openNewTab} title={t.openNewTab}><ExternalLink className="h-4 w-4" /></button>
+          <button className="rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white" data-testid="download-doc-btn" onClick={downloadFile} title={t.downloadFile}><Download className="h-4 w-4" /></button>
+          <button className="rounded-lg p-2 text-zinc-400 hover:bg-white/10 hover:text-white" data-testid="close-preview-button" onClick={onClose}><X className="h-5 w-5" /></button>
+        </div>
+      </div>
+      <div className="flex flex-1 items-center justify-center overflow-auto p-4" onClick={(e) => e.stopPropagation()}>
+        {doc.type === "image" ? (
+          <img alt="Document preview" className="rounded-lg object-contain transition-transform duration-200" data-testid="image-preview-img" src={doc.url} style={{ transform: `scale(${zoom})`, maxHeight: "85vh", maxWidth: "95vw" }} />
+        ) : doc.type === "pdf" ? (
+          <iframe className="h-full w-full max-w-4xl rounded-lg border border-white/10 bg-white" data-testid="pdf-preview-frame" src={doc.url} style={{ minHeight: "75vh" }} title="PDF Preview" />
+        ) : (
+          <div className="flex flex-col items-center gap-4 rounded-2xl border border-white/10 bg-zinc-950 p-8 text-center" data-testid="unsupported-preview">
+            <FileText className="h-16 w-16 text-zinc-500" />
+            <p className="text-lg font-medium text-white">{doc.filename}</p>
+            <p className="text-sm text-zinc-400">{doc.contentType}</p>
+            <div className="flex gap-3">
+              <Button data-testid="unsupported-open-btn" onClick={openNewTab} variant="outline"><ExternalLink className="mr-2 h-4 w-4" /> {t.openNewTab}</Button>
+              <Button data-testid="unsupported-download-btn" onClick={downloadFile}><Download className="mr-2 h-4 w-4" /> {t.downloadFile}</Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const DocActionButtons = ({ label, icon: Icon, hasFile, onPreview, onOpenTab, onDownload, testIdPrefix }) => (
+  <div className="flex items-center gap-1.5">
+    <Button className="touch-button flex-1 rounded-full text-xs" data-testid={`${testIdPrefix}-preview-btn`} disabled={!hasFile} onClick={onPreview} size="sm" variant="outline">
+      <Icon className="mr-1.5 h-3.5 w-3.5" /> {label}
+    </Button>
+    <button className="rounded-lg p-1.5 text-zinc-500 hover:bg-white/10 hover:text-white disabled:opacity-30" data-testid={`${testIdPrefix}-newtab-btn`} disabled={!hasFile} onClick={onOpenTab} title="Open in new tab"><ExternalLink className="h-3.5 w-3.5" /></button>
+    <button className="rounded-lg p-1.5 text-zinc-500 hover:bg-white/10 hover:text-white disabled:opacity-30" data-testid={`${testIdPrefix}-download-btn`} disabled={!hasFile} onClick={onDownload} title="Download"><Download className="h-3.5 w-3.5" /></button>
+  </div>
+);
+
 const BookingDetailDialog = ({ booking, language, onClose, onSave, token, currencyCode, onFinalPaymentUpload }) => {
   const t = translations[language];
   const [formState, setFormState] = useState(null);
   const [uploadingFinal, setUploadingFinal] = useState(false);
-  const [previewImage, setPreviewImage] = useState(null);
+  const [previewDoc, setPreviewDoc] = useState(null);
 
   useEffect(() => {
     if (booking) {
@@ -1172,16 +1236,18 @@ const BookingDetailDialog = ({ booking, language, onClose, onSave, token, curren
     }
   };
 
-  const handleDocPreview = async (documentType) => {
+  const fetchDoc = async (documentType) => {
     try {
-      const result = await openProtectedDocument(token, booking.id, documentType);
-      if (result?.type === "image") {
-        setPreviewImage(result.url);
-      }
+      return await openProtectedDocument(token, booking.id, documentType);
     } catch (err) {
       toast.error(err.message);
+      return null;
     }
   };
+  const handlePreview = async (docType) => { const d = await fetchDoc(docType); if (d) setPreviewDoc(d); };
+  const handleOpenTab = async (docType) => { const d = await fetchDoc(docType); if (d) window.open(d.url, "_blank", "noopener,noreferrer"); };
+  const handleDownload = async (docType) => { const d = await fetchDoc(docType); if (d) { const a = document.createElement("a"); a.href = d.url; a.download = d.filename; a.click(); } };
+  const closePreview = () => { if (previewDoc) URL.revokeObjectURL(previewDoc.url); setPreviewDoc(null); };
 
   return (
     <Dialog onOpenChange={(open) => !open && onClose()} open={Boolean(booking)}>
@@ -1218,28 +1284,18 @@ const BookingDetailDialog = ({ booking, language, onClose, onSave, token, curren
                 <span className="status-chip bg-black/20 text-zinc-200" key={flag.label}>{flag.label}</span>
               ))}
             </div>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{t.documents}</p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Button className="touch-button rounded-full" data-testid="open-payment-proof-button" onClick={() => handleDocPreview("payment_proof")} type="button" variant="outline">
-                  <FileText className="mr-2 h-4 w-4" /> {t.depositProofField}
-                </Button>
-                <Button className="touch-button rounded-full" data-testid="open-certificate-button" onClick={() => handleDocPreview("vaccination_certificate")} type="button" variant="outline">
-                  <ShieldCheck className="mr-2 h-4 w-4" /> {t.vaccinationCertificate}
-                </Button>
-              </div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {booking.final_payment_proof ? (
-                  <Button className="touch-button rounded-full" data-testid="open-final-payment-proof-button" onClick={() => handleDocPreview("final_payment_proof")} type="button" variant="outline">
-                    <CreditCard className="mr-2 h-4 w-4" /> {t.finalPaymentProofField}
-                  </Button>
-                ) : (
-                  <label className="touch-button inline-flex cursor-pointer items-center justify-center rounded-full border border-dashed border-white/20 px-4 py-2.5 text-sm text-zinc-400 transition-colors hover:border-white/40 hover:text-white" data-testid="upload-final-payment-button">
-                    <UploadCloud className="mr-2 h-4 w-4" /> {uploadingFinal ? "..." : t.uploadFinalPaymentProof}
-                    <input accept=".pdf,image/*" className="hidden" disabled={uploadingFinal} onChange={handleFinalPaymentUpload} type="file" />
-                  </label>
-                )}
-              </div>
+              <DocActionButtons hasFile={!!booking.payment_proof} icon={FileText} label={t.depositProofField} onDownload={() => handleDownload("payment_proof")} onOpenTab={() => handleOpenTab("payment_proof")} onPreview={() => handlePreview("payment_proof")} testIdPrefix="deposit-proof" />
+              <DocActionButtons hasFile={!!booking.vaccination_certificate} icon={ShieldCheck} label={t.vaccinationCertificate} onDownload={() => handleDownload("vaccination_certificate")} onOpenTab={() => handleOpenTab("vaccination_certificate")} onPreview={() => handlePreview("vaccination_certificate")} testIdPrefix="vaccine-cert" />
+              {booking.final_payment_proof ? (
+                <DocActionButtons hasFile icon={CreditCard} label={t.finalPaymentProofField} onDownload={() => handleDownload("final_payment_proof")} onOpenTab={() => handleOpenTab("final_payment_proof")} onPreview={() => handlePreview("final_payment_proof")} testIdPrefix="final-payment" />
+              ) : (
+                <label className="touch-button inline-flex w-full cursor-pointer items-center justify-center rounded-full border border-dashed border-white/20 px-4 py-2.5 text-sm text-zinc-400 transition-colors hover:border-white/40 hover:text-white" data-testid="upload-final-payment-button">
+                  <UploadCloud className="mr-2 h-4 w-4" /> {uploadingFinal ? "..." : t.uploadFinalPaymentProof}
+                  <input accept=".pdf,image/*" className="hidden" disabled={uploadingFinal} onChange={handleFinalPaymentUpload} type="file" />
+                </label>
+              )}
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
@@ -1298,16 +1354,7 @@ const BookingDetailDialog = ({ booking, language, onClose, onSave, token, curren
           </div>
         </div>
       </DialogContent>
-      {previewImage && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 p-4" data-testid="image-preview-overlay" onClick={() => { URL.revokeObjectURL(previewImage); setPreviewImage(null); }}>
-          <div className="relative max-h-[90vh] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
-            <button className="absolute -right-3 -top-3 flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 text-white hover:bg-zinc-700" data-testid="close-preview-button" onClick={() => { URL.revokeObjectURL(previewImage); setPreviewImage(null); }}>
-              <X className="h-4 w-4" />
-            </button>
-            <img alt="Document preview" className="max-h-[85vh] max-w-full rounded-xl object-contain" data-testid="image-preview-img" src={previewImage} />
-          </div>
-        </div>
-      )}
+      <DocumentPreviewModal doc={previewDoc} language={language} onClose={closePreview} />
     </Dialog>
   );
 };

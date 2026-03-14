@@ -239,29 +239,28 @@ export const adminApi = {
 
 export const getProtectedDocumentUrl = (bookingId, documentType) => `${API_URL}/admin/documents/${bookingId}/${documentType}`;
 
-export const openProtectedDocument = async (token, bookingId, documentType) => {
+export const fetchProtectedDocument = async (token, bookingId, documentType) => {
   const response = await fetch(getProtectedDocumentUrl(bookingId, documentType), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { Authorization: `Bearer ${token}` },
   });
-
   if (!response.ok) {
     const errorPayload = await response.json().catch(() => ({}));
     throw new Error(errorPayload.detail || "Unable to open document.");
   }
-
-  const contentType = response.headers.get("content-type") || "";
+  const contentType = response.headers.get("content-type") || "application/octet-stream";
+  const disposition = response.headers.get("content-disposition") || "";
+  const filenameMatch = disposition.match(/filename="?([^";\n]+)"?/);
+  const filename = filenameMatch ? filenameMatch[1] : `document.${contentType.split("/")[1] || "bin"}`;
   const blob = await response.blob();
   const blobWithType = new Blob([blob], { type: contentType });
   const url = URL.createObjectURL(blobWithType);
+  let type = "unsupported";
+  if (contentType.startsWith("image/")) type = "image";
+  else if (contentType === "application/pdf") type = "pdf";
+  return { type, url, contentType, filename };
+};
 
-  if (contentType.startsWith("image/")) {
-    // Return info for the preview modal instead of opening a new tab
-    return { type: "image", url, contentType };
-  }
-  // PDFs and other files: open in new tab
-  window.open(url, "_blank", "noopener,noreferrer");
-  setTimeout(() => URL.revokeObjectURL(url), 30000);
-  return { type: "other", url };
+export const openProtectedDocument = async (token, bookingId, documentType) => {
+  const result = await fetchProtectedDocument(token, bookingId, documentType);
+  return result;
 };
