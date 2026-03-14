@@ -40,6 +40,7 @@ Single-page monolith: entire frontend in `/app/frontend/src/App.js`, backend in 
 15. HEIC to JPEG conversion for mobile uploads
 16. **Advanced Document Viewer** - Rich preview modal with image zoom/pan, PDF embedding, fallback for unsupported types, open in new tab, download (Completed & Tested Feb 2026)
 17. **Initialization Resilience Fix** - Added automatic retry (3 attempts with backoff), error state with Retry button, Toaster during loading, and 15s API timeout. Fixes permanent "Loading PAWS TRAINING..." stuck state on slow/mobile connections (Fixed Feb 2026)
+18. **Infinite API Loop Fix** - Fixed `useCallback` dependency on `publicState.config` that caused `refreshPublicData` → state update → new callback → useEffect → infinite API call loop. Replaced with `configLoadedRef` (useRef). Root cause of production breakage after deployment. (Fixed Feb 2026)
 
 ## Key API Endpoints
 - `POST /api/auth/login` - Admin login

@@ -2528,6 +2528,7 @@ function App() {
   const [publicState, setPublicState] = useState({ config: null, programs: [] });
   const [initError, setInitError] = useState(false);
   const retryCountRef = useRef(0);
+  const configLoadedRef = useRef(false);
 
   const refreshPublicData = useCallback(async () => {
     try {
@@ -2535,9 +2536,10 @@ function App() {
       setPublicState({ config, programs });
       setInitError(false);
       retryCountRef.current = 0;
+      configLoadedRef.current = true;
     } catch (error) {
       toast.error(error.message);
-      if (!publicState.config) {
+      if (!configLoadedRef.current) {
         if (retryCountRef.current < 3) {
           retryCountRef.current += 1;
           setTimeout(() => refreshPublicData(), 2000 * retryCountRef.current);
@@ -2546,7 +2548,7 @@ function App() {
         }
       }
     }
-  }, [publicState.config]);
+  }, []);
 
   useEffect(() => {
     document.documentElement.classList.add("dark");
