@@ -121,6 +121,19 @@ Core business rules:
 - Bilingual translations (ES/EN) for all new labels and status values
 - Testing agent: 100% pass (12/12 backend, all frontend verified)
 
+### 2026-03-14 (deposit config)
+- Added configurable deposit settings to each program: deposit_type (percentage/fixed) and deposit_value
+- Deposit computation: percentage mode = price * value / 100; fixed mode = min(value, price); balance = price - deposit
+- Program cards and form show deposit type, value, and computed deposit/balance split
+- Booking detail dialog shows deposit_amount and balance_amount
+- Public booking success panel shows deposit and balance breakdown
+- Dashboard financial metrics: total_deposit_expected, total_deposit_collected, total_balance_expected, total_balance_collected
+- Dashboard cards: "Depósitos cobrados" and "Saldo por cobrar"
+- Migration backfills existing programs with deposit_type=percentage, deposit_value=50
+- Backward compatibility: old bookings without deposit config in snapshot default to 100% deposit
+- Bilingual translations (ES/EN) for all new labels
+- Testing agent: 100% pass (13/13 backend, all frontend verified)
+
 ## Prioritized Backlog
 1. Add richer chart drill-downs and exportable reporting
 2. Split large frontend file into smaller modules for maintainability
