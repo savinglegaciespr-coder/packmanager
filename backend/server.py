@@ -2,6 +2,7 @@ import asyncio
 import logging
 import math
 import os
+import secrets
 import smtplib
 import uuid
 import base64
@@ -855,6 +856,16 @@ async def ensure_seed_data() -> None:
         {"$set": {"deposit_type": "percentage", "deposit_value": 50.0}},
     )
 
+    # Backfill final_payment_token for bookings that lack it
+    bookings_without_token = await db.bookings.find(
+        {"final_payment_token": {"$exists": False}}, {"_id": 0, "id": 1}
+    ).to_list(5000)
+    for b in bookings_without_token:
+        await db.bookings.update_one(
+            {"id": b["id"]},
+            {"$set": {"final_payment_token": secrets.token_urlsafe(32)}},
+        )
+
 
 async def expire_stale_bookings() -> int:
     now = iso_now()
@@ -1100,6 +1111,101 @@ async def send_rejection_email(booking: Dict[str, Any]) -> None:
     await queue_email(booking["owner"]["email"], subject, body, audience="client", booking_id=booking["id"], locale=locale)
 
 
+async def send_deposit_verified_email(booking: Dict[str, Any]) -> None:
+    locale = booking.get("locale", "es")
+    settings_doc = await get_business_settings()
+    currency = settings_doc.get("currency", "USD")
+    price = float(booking.get("program_price", 0))
+    snapshot = booking.get("program_snapshot") or {}
+    amounts = compute_deposit_amounts(price, snapshot.get("deposit_type", "percentage"), snapshot.get("deposit_value", 100.0))
+    balance_label = format_money(amounts["balance_amount"], currency)
+    token = booking.get("final_payment_token", "")
+    frontend_url = os.environ.get("FRONTEND_URL", "")
+    if not frontend_url:
+        frontend_url = settings_doc.get("site_url", settings_doc.get("frontend_url", ""))
+    payment_link = f"{frontend_url}/payment/{token}" if token else ""
+    program_name = booking["program_name_en"] if locale == "en" else booking["program_name_es"]
+
+    if locale == "en":
+        subject = "PAWS TRAINING — Deposit verified"
+        body = (
+            f"Hi {booking['owner']['full_name']},\n\n"
+            f"Your deposit for {booking['dog']['name']} ({program_name}) has been verified.\n\n"
+            f"Remaining balance: {balance_label}.\n\n"
+            f"Please upload your final payment proof using this secure link:\n{payment_link}\n\n"
+            f"Thank you for choosing PAWS TRAINING."
+        )
+    else:
+        subject = "PAWS TRAINING — Depósito verificado"
+        body = (
+            f"Hola {booking['owner']['full_name']},\n\n"
+            f"Tu depósito para {booking['dog']['name']} ({program_name}) ha sido verificado.\n\n"
+            f"Saldo pendiente: {balance_label}.\n\n"
+            f"Por favor sube tu comprobante de pago final usando este enlace seguro:\n{payment_link}\n\n"
+            f"Gracias por confiar en PAWS TRAINING."
+        )
+    await queue_email(booking["owner"]["email"], subject, body, audience="client", booking_id=booking["id"], locale=locale)
+
+
+# --- Public endpoints: token-based final payment upload ---
+
+
+@api_router.get("/public/booking-payment/{token}")
+async def get_booking_by_payment_token(token: str) -> Dict[str, Any]:
+    booking = await db.bookings.find_one({"final_payment_token": token}, {"_id": 0})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found or link expired.")
+    settings_doc = await get_business_settings()
+    currency = settings_doc.get("currency", "USD")
+    price = float(booking.get("program_price", 0))
+    snapshot = booking.get("program_snapshot") or {}
+    amounts = compute_deposit_amounts(price, snapshot.get("deposit_type", "percentage"), snapshot.get("deposit_value", 100.0))
+    return {
+        "booking_id": booking["id"],
+        "owner_name": booking["owner"]["full_name"],
+        "dog_name": booking["dog"]["name"],
+        "program_name_es": booking["program_name_es"],
+        "program_name_en": booking["program_name_en"],
+        "program_price": price,
+        "deposit_amount": amounts["deposit_amount"],
+        "balance_amount": amounts["balance_amount"],
+        "start_week": booking["start_week"],
+        "status": booking["status"],
+        "payment_status": booking.get("payment_status", "Pending Review"),
+        "final_payment_status": booking.get("final_payment_status", "Pending Review"),
+        "overall_payment_status": compute_overall_payment_status(booking),
+        "final_payment_proof_uploaded": booking.get("final_payment_proof") is not None,
+        "locale": booking.get("locale", "es"),
+        "currency": currency,
+        "business_name": settings_doc.get("business_name", "PAWS TRAINING"),
+    }
+
+
+@api_router.post("/public/booking-payment/{token}/upload")
+async def upload_final_payment_via_token(token: str, file: UploadFile = File(...)) -> Dict[str, Any]:
+    booking = await db.bookings.find_one({"final_payment_token": token}, {"_id": 0})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found or link expired.")
+    if booking.get("final_payment_proof"):
+        raise HTTPException(status_code=400, detail="Final payment proof has already been uploaded.")
+    if booking.get("payment_status") != "Verified":
+        raise HTTPException(status_code=400, detail="Deposit must be verified before uploading final payment.")
+    booking_dir = UPLOAD_DIR / booking["id"]
+    booking_dir.mkdir(parents=True, exist_ok=True)
+    file_info = await save_upload(file, booking_dir, "final-payment-proof")
+    await db.bookings.update_one(
+        {"id": booking["id"]},
+        {"$set": {"final_payment_proof": file_info, "updated_at": iso_now()}},
+    )
+    settings_doc = await get_business_settings()
+    admin_email = settings_doc.get("admin_notification_email", "")
+    if admin_email:
+        admin_subject = f"Pago final recibido — {booking['dog']['name']}"
+        admin_body = f"{booking['owner']['full_name']} ha subido el comprobante de pago final para {booking['dog']['name']}. Programa: {booking['program_name_es']}. Revisa en el panel de administración."
+        await queue_email(admin_email, admin_subject, admin_body, audience="admin", booking_id=booking["id"], locale="es")
+    return {"message": "Final payment proof uploaded successfully.", "overall_payment_status": "Balance Pending"}
+
+
 async def build_dashboard_payload() -> Dict[str, Any]:
     await expire_stale_bookings()
     bookings = [sanitize_booking(item) for item in await db.bookings.find({}, {"_id": 0}).to_list(2000)]
@@ -1330,6 +1436,7 @@ async def create_public_booking(
     await validate_capacity_for_program(normalized_start, span_weeks)
 
     booking_id = str(uuid.uuid4())
+    final_payment_token = secrets.token_urlsafe(32)
     booking_dir = UPLOAD_DIR / booking_id
     booking_dir.mkdir(parents=True, exist_ok=True)
     payment_file = await save_upload(payment_proof, booking_dir, "payment-proof")
@@ -1384,6 +1491,7 @@ async def create_public_booking(
         "created_at": now,
         "updated_at": now,
         "approved_at": None,
+        "final_payment_token": final_payment_token,
         "request_source": str(request.client.host) if request.client else "unknown",
     }
     await db.bookings.insert_one(booking_doc.copy())
@@ -1483,6 +1591,11 @@ async def update_booking(booking_id: str, payload: BookingUpdateRequest, _: Dict
     if booking["status"] != updated_booking["status"] and updated_booking["status"] == "Rejected":
         await send_rejection_email(updated_booking)
 
+    old_deposit = booking.get("payment_status", "Pending Review")
+    new_deposit = updated_booking.get("payment_status", "Pending Review")
+    if old_deposit != "Verified" and new_deposit == "Verified":
+        await send_deposit_verified_email(updated_booking)
+
     return sanitize_booking(updated_booking)
 
 
@@ -1553,6 +1666,7 @@ async def create_manual_booking(payload: ManualBookingCreate, _: Dict[str, Any] 
         "created_at": now,
         "updated_at": now,
         "approved_at": now if payload.status in {"Approved", "Scheduled", "In Training", "Delivered"} else None,
+        "final_payment_token": secrets.token_urlsafe(32),
     }
     await db.bookings.insert_one(booking_doc.copy())
     return sanitize_booking(booking_doc)

@@ -21,6 +21,7 @@ import {
   Routes,
   useLocation,
   useNavigate,
+  useParams,
 } from "react-router-dom";
 import {
   AlertTriangle,
@@ -912,6 +913,123 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
         </Card>
       </main>
       <AppFooter config={config} />
+    </div>
+  );
+};
+
+const FinalPaymentPage = ({ language, setLanguage }) => {
+  const { token } = useParams();
+  const t = translations[language];
+  const [booking, setBooking] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [file, setFile] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await publicApi.getBookingByPaymentToken(token);
+        setBooking(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [token]);
+
+  const lang = booking?.locale || language;
+  const tt = translations[lang] || t;
+  const fmt = (amount) => formatCurrency(amount, lang, booking?.currency || "USD");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!file) return;
+    setSubmitting(true);
+    try {
+      await publicApi.uploadFinalPaymentByToken(token, file);
+      setSubmitted(true);
+      toast.success(tt.finalPaymentSuccess);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) return <div className="flex min-h-screen items-center justify-center bg-black text-white">...</div>;
+
+  if (error || !booking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black p-4 text-center text-white" data-testid="payment-link-error">
+        <div className="space-y-4">
+          <AlertTriangle className="mx-auto h-12 w-12 text-red-500" />
+          <p className="text-lg">{tt.finalPaymentLinkInvalid}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const depositNotReady = booking.payment_status !== "Verified";
+  const alreadyUploaded = booking.final_payment_proof_uploaded;
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-black p-4" data-testid="final-payment-page">
+      <Card className="w-full max-w-lg rounded-[2rem] border-white/10 bg-zinc-950 text-white">
+        <CardHeader className="text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-red-500">{booking.business_name}</p>
+          <CardTitle className="mt-2 text-2xl">{tt.finalPaymentPageTitle}</CardTitle>
+          <CardDescription className="text-zinc-400">{tt.finalPaymentPageSubtitle}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-3" data-testid="payment-booking-summary">
+            <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{tt.bookingSummary}</p>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <p className="text-zinc-400">{tt.ownerLabel}</p>
+              <p className="text-zinc-200">{booking.owner_name}</p>
+              <p className="text-zinc-400">{tt.dogLabel}</p>
+              <p className="text-zinc-200">{booking.dog_name}</p>
+              <p className="text-zinc-400">{tt.programName}</p>
+              <p className="text-zinc-200">{lang === "es" ? booking.program_name_es : booking.program_name_en}</p>
+              <p className="text-zinc-400">{tt.reservationSummaryPrice}</p>
+              <p className="text-zinc-200">{fmt(booking.program_price)}</p>
+              <p className="text-zinc-400">{tt.depositLabel}</p>
+              <p className="text-green-400">{fmt(booking.deposit_amount)} <CheckCircle2 className="ml-1 inline h-4 w-4" /></p>
+              <p className="text-zinc-400 font-semibold">{tt.remainingBalance}</p>
+              <p className="text-white font-semibold text-lg">{fmt(booking.balance_amount)}</p>
+            </div>
+          </div>
+
+          {depositNotReady ? (
+            <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-5 text-center text-yellow-200" data-testid="deposit-not-ready-message">
+              <AlertTriangle className="mx-auto mb-2 h-8 w-8" />
+              <p>{tt.finalPaymentNotReady}</p>
+            </div>
+          ) : alreadyUploaded && !submitted ? (
+            <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-5 text-center text-blue-200" data-testid="already-uploaded-message">
+              <CheckCircle2 className="mx-auto mb-2 h-8 w-8" />
+              <p>{tt.finalPaymentAlreadyUploaded}</p>
+            </div>
+          ) : submitted ? (
+            <div className="rounded-2xl border border-green-500/20 bg-green-500/5 p-5 text-center text-green-200" data-testid="upload-success-message">
+              <CheckCircle2 className="mx-auto mb-2 h-8 w-8" />
+              <p>{tt.finalPaymentSuccess}</p>
+            </div>
+          ) : (
+            <form className="space-y-4" data-testid="final-payment-form" onSubmit={handleSubmit}>
+              <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4">
+                <p className="mb-3 text-sm text-zinc-300">{tt.finalPaymentUploadLabel}</p>
+                <input accept=".pdf,image/*" data-testid="final-payment-file-input" onChange={(e) => setFile(e.target.files?.[0] || null)} required type="file" />
+              </div>
+              <Button className="w-full rounded-full bg-primary text-white hover:bg-red-700" data-testid="final-payment-submit-button" disabled={submitting || !file} type="submit">
+                {submitting ? "..." : tt.finalPaymentSubmitButton}
+              </Button>
+            </form>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
@@ -2267,6 +2385,7 @@ const AppRoutes = ({ publicState, session, setSession, language, setLanguage, re
     <Routes>
       <Route path="/" element={<LandingPage config={publicState.config} language={language} programs={publicState.programs} setLanguage={setLanguage} showAdminAccess={showAdminAccess} />} />
       <Route path="/book" element={<BookingPage config={publicState.config} language={language} programs={publicState.programs} setLanguage={setLanguage} showAdminAccess={showAdminAccess} />} />
+      <Route path="/payment/:token" element={<FinalPaymentPage language={language} setLanguage={setLanguage} />} />
       <Route path="/admin/login" element={<AdminLoginPage config={publicState.config} language={language} onLogin={handleLogin} setLanguage={setLanguage} showAdminAccess={showAdminAccess} />} />
       <Route
         path="/admin/*"

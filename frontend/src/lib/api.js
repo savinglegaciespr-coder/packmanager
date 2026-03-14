@@ -42,6 +42,26 @@ export const publicApi = {
       return normalizeError(error);
     }
   },
+  async getBookingByPaymentToken(token) {
+    try {
+      const response = await client.get(`/public/booking-payment/${token}`);
+      return response.data;
+    } catch (error) {
+      return normalizeError(error);
+    }
+  },
+  async uploadFinalPaymentByToken(token, file) {
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const response = await client.post(`/public/booking-payment/${token}/upload`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return response.data;
+    } catch (error) {
+      return normalizeError(error);
+    }
+  },
   async submitBooking(formData) {
     try {
       const response = await client.post("/public/bookings", formData, {
