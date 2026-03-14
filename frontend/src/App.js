@@ -535,7 +535,7 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
     sex: "Male",
     weight: "",
     date_of_birth_input: "",
-    vaccination_status: language === "es" ? "Vacunas al día" : "Vaccines up to date",
+    vaccination_status: language === "es" ? translations.es.yes : translations.en.yes,
     allergies: "",
     behavior_goals: "",
     current_medication: "",
@@ -583,9 +583,10 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
     setFormState((current) => ({
       ...current,
       locale: language,
-      vaccination_status:
-        [translations.es.vaccinationUpToDate, translations.en.vaccinationUpToDate].includes(current.vaccination_status)
-          ? translations[language].vaccinationUpToDate
+      vaccination_status: [translations.es.vaccinationUpToDate, translations.en.vaccinationUpToDate, translations.es.yes, translations.en.yes, "Up to date"].includes(current.vaccination_status)
+        ? translations[language].yes
+        : [translations.es.no, translations.en.no, "No"].includes(current.vaccination_status)
+          ? translations[language].no
           : current.vaccination_status,
     }));
   }, [language]);
@@ -640,7 +641,7 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
         breed: "",
         weight: "",
         date_of_birth_input: "",
-        vaccination_status: t.vaccinationUpToDate,
+        vaccination_status: t.yes,
         allergies: "",
         behavior_goals: "",
         current_medication: "",
@@ -841,7 +842,13 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
                     {t.automaticAge}: <span className="text-zinc-200">{computedDogAge || t.agePending}</span>
                   </p>
                 </div>
-                <Input data-testid="dog-vaccination-status-input" onChange={(event) => updateField("vaccination_status", event.target.value)} placeholder={t.vaccinationStatus} required value={formState.vaccination_status} />
+                <div>
+                  <label className="mb-2 block text-sm text-zinc-300" data-testid="dog-vaccination-status-label">{t.vaccinationStatus}</label>
+                  <select className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="dog-vaccination-status-input" onChange={(event) => updateField("vaccination_status", event.target.value)} value={formState.vaccination_status}>
+                    <option value={t.yes}>{t.yes}</option>
+                    <option value={t.no}>{t.no}</option>
+                  </select>
+                </div>
                 <Input data-testid="dog-allergies-input" onChange={(event) => updateField("allergies", event.target.value)} placeholder={t.allergies} value={formState.allergies} />
                 <div className="md:col-span-2">
                   <Textarea data-testid="dog-goals-textarea" onChange={(event) => updateField("behavior_goals", event.target.value)} placeholder={t.goals} required value={formState.behavior_goals} />
@@ -1088,7 +1095,7 @@ const ManualBookingDialog = ({ open, onClose, programs, onCreate, language }) =>
     sex: "Male",
     weight: "",
     date_of_birth: "",
-    vaccination_status: "Up to date",
+    vaccination_status: language === "es" ? t.yes : translations.en.yes,
     allergies: "",
     behavior_goals: "",
     current_medication: "",
@@ -1144,7 +1151,13 @@ const ManualBookingDialog = ({ open, onClose, programs, onCreate, language }) =>
           <Input data-testid="manual-dog-age-input" onChange={(event) => update("age", event.target.value)} placeholder={t.age} value={formState.age} />
           <Input data-testid="manual-dog-weight-input" onChange={(event) => update("weight", event.target.value)} placeholder={t.weight} value={formState.weight} />
           <Input data-testid="manual-dob-input" onChange={(event) => update("date_of_birth", event.target.value)} type="date" value={formState.date_of_birth} />
-          <Input data-testid="manual-vaccination-status-input" onChange={(event) => update("vaccination_status", event.target.value)} placeholder={t.vaccinationStatus} value={formState.vaccination_status} />
+          <div>
+            <label className="mb-2 block text-sm text-zinc-300" data-testid="manual-vaccination-status-label">{t.vaccinationStatus}</label>
+            <select className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="manual-vaccination-status-input" onChange={(event) => update("vaccination_status", event.target.value)} value={formState.vaccination_status}>
+              <option value={t.yes}>{t.yes}</option>
+              <option value={t.no}>{t.no}</option>
+            </select>
+          </div>
           <select className="h-11 rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="manual-booking-status-select" onChange={(event) => update("status", event.target.value)} value={formState.status}>
             {STATUS_OPTIONS.map((option) => <option key={option} value={option}>{t.status[option] || option}</option>)}
           </select>

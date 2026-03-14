@@ -93,6 +93,7 @@ Core business rules:
 - Clarified the reservation review modal with explicit field labels and automatic read-only intake/delivery dates derived from the booking’s selected week and stored program duration
 - Replaced the booking week selector with a monthly visual calendar interface that reuses existing weekly capacity data, color-codes availability, and preserves the current booking/capacity logic across desktop and mobile
 - Added frontend-only email confirmation validation in the public booking form, including a confirm-email field, valid email format checks, and clear mismatch messaging without changing stored booking data
+- Standardized the vaccination declaration field across the public and manual booking forms as a simple yes/no selector labeled “Vacunas al día,” while preserving the separate certificate upload/review workflow
 - Implemented FastAPI backend for public config, programs, weeks, booking submission, admin auth, dashboard, bookings, settings, logo upload, document access, and capacity management
 - Added weekly capacity engine with multi-week occupancy protection, override support, and 24-hour pending expiration logic
 - Added admin workspace with dashboard charts/metrics, bookings filters, detail dialog, document status controls, manual booking creation, programs management, capacity controls, settings, and email log view
