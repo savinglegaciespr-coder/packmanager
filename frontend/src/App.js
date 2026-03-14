@@ -169,6 +169,19 @@ const getProgramDurationDays = (durationValue, durationUnit) => {
   return durationUnit === "weeks" ? normalizedValue * 7 : normalizedValue;
 };
 
+const getProgramSpanWeeks = (program) => {
+  if (!program) return 0;
+  if (program.duration_unit === "weeks") return Math.max(Number(program.duration_value || 0), 1);
+  return Math.max(Math.ceil(Number(program.duration_value || 0) / 7), 1);
+};
+
+const shiftIsoDateByWeeks = (isoDate, weekOffset) => {
+  const baseDate = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(baseDate.getTime())) return "";
+  baseDate.setDate(baseDate.getDate() + weekOffset * 7);
+  return baseDate.toISOString().split("T")[0];
+};
+
 const getScheduleDatesFromProgram = (startDateValue, durationValue, durationUnit) => {
   if (!startDateValue) {
     return { intake_date: "", delivery_date: "" };
@@ -1091,7 +1104,7 @@ const BookingDetailDialog = ({ booking, language, onClose, onSave, token, curren
   );
 };
 
-const ManualBookingDialog = ({ open, onClose, programs, onCreate, language }) => {
+const ManualBookingDialog = ({ open, onClose, programs, onCreate, language, capacityWeeks }) => {
   const t = translations[language];
   const [formState, setFormState] = useState({
     program_id: programs[0]?.id || "",
@@ -1118,12 +1131,33 @@ const ManualBookingDialog = ({ open, onClose, programs, onCreate, language }) =>
     eligibility_status: "Eligible",
   });
   const selectedProgram = useMemo(() => programs.find((program) => program.id === formState.program_id), [formState.program_id, programs]);
+  const selectedProgramSpanWeeks = useMemo(() => getProgramSpanWeeks(selectedProgram), [selectedProgram]);
   const manualDogAge = useMemo(() => calculateDogAge(formState.date_of_birth, language), [formState.date_of_birth, language]);
   const manualScheduleDates = useMemo(
     () => getScheduleDatesFromProgram(formState.start_week, selectedProgram?.duration_value, selectedProgram?.duration_unit),
     [formState.start_week, selectedProgram],
   );
   const maxDogBirthDate = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const capacityWeekLookup = useMemo(() => new Map(capacityWeeks.map((week) => [week.week_start, week])), [capacityWeeks]);
+  const weekOptions = useMemo(
+    () =>
+      capacityWeeks.map((week) => {
+        const blockedBySpan = Array.from({ length: selectedProgramSpanWeeks }, (_, index) => shiftIsoDateByWeeks(week.week_start, index)).some(
+          (candidateWeek) => {
+            const candidateData = capacityWeekLookup.get(candidateWeek);
+            return !candidateData || candidateData.remaining <= 0;
+          },
+        );
+
+        return {
+          ...week,
+          isBlockedStart: blockedBySpan,
+          displayStatus: blockedBySpan ? "full" : week.availability_label,
+        };
+      }),
+    [capacityWeekLookup, capacityWeeks, selectedProgramSpanWeeks],
+  );
+  const selectedWeekOption = useMemo(() => weekOptions.find((week) => week.week_start === formState.start_week), [formState.start_week, weekOptions]);
 
   useEffect(() => {
     if (programs.length && !formState.program_id) {
@@ -1131,9 +1165,19 @@ const ManualBookingDialog = ({ open, onClose, programs, onCreate, language }) =>
     }
   }, [formState.program_id, programs]);
 
+  useEffect(() => {
+    if (selectedWeekOption?.isBlockedStart) {
+      setFormState((current) => ({ ...current, start_week: "" }));
+    }
+  }, [selectedWeekOption]);
+
   const update = (key, value) => setFormState((current) => ({ ...current, [key]: value }));
 
   const handleCreate = async () => {
+    if (!formState.start_week || selectedWeekOption?.isBlockedStart) {
+      toast.error(t.weekFullWarning);
+      return;
+    }
     await onCreate({
       ...formState,
       age: manualDogAge,
@@ -1161,9 +1205,36 @@ const ManualBookingDialog = ({ open, onClose, programs, onCreate, language }) =>
               {programs.map((program) => <option key={program.id} value={program.id}>{language === "es" ? program.name_es : program.name_en}</option>)}
             </select>
           </div>
-          <div>
+          <div className="md:col-span-2">
             <label className="mb-2 block text-sm text-zinc-300" data-testid="manual-start-week-label">{t.selectWeek}</label>
-            <Input data-testid="manual-start-week-input" onChange={(event) => update("start_week", event.target.value)} type="date" value={formState.start_week} />
+            <div className="grid max-h-56 gap-2 overflow-y-auto rounded-2xl border border-white/10 bg-black/20 p-3 sm:grid-cols-2" data-testid="manual-week-selector">
+              {weekOptions.map((week) => {
+                const weekClasses =
+                  week.displayStatus === "full"
+                    ? "border-red-500/30 bg-red-500/12 text-red-100"
+                    : week.displayStatus === "almost_full"
+                      ? "border-yellow-500/30 bg-yellow-500/12 text-yellow-100"
+                      : "border-green-500/30 bg-green-500/12 text-green-100";
+
+                return (
+                  <button
+                    className={`rounded-2xl border p-3 text-left transition-transform duration-200 hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-80 ${weekClasses} ${formState.start_week === week.week_start ? "ring-2 ring-white/80" : ""}`}
+                    data-testid={`manual-week-card-${week.week_start}`}
+                    disabled={week.isBlockedStart}
+                    key={week.week_start}
+                    onClick={() => update("start_week", week.week_start)}
+                    type="button"
+                  >
+                    <p className="text-sm font-semibold">{formatDisplayDate(week.week_start, language)}</p>
+                    <p className="mt-2 text-xs">{week.remaining} {t.spacesLeft}</p>
+                    <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em]">{t.status[week.displayStatus]}</p>
+                  </button>
+                );
+              })}
+            </div>
+            {selectedWeekOption?.isBlockedStart && (
+              <p className="mt-2 text-sm text-red-300" data-testid="manual-week-full-warning">{t.weekFullWarning}</p>
+            )}
           </div>
           <Input data-testid="manual-owner-name-input" onChange={(event) => update("owner_full_name", event.target.value)} placeholder={t.fullName} value={formState.owner_full_name} />
           <Input data-testid="manual-owner-email-input" onChange={(event) => update("owner_email", event.target.value)} placeholder={t.email} type="email" value={formState.owner_email} />
@@ -1317,7 +1388,7 @@ const DashboardView = ({ dashboard, language, currencyCode }) => {
   );
 };
 
-const BookingsView = ({ bookings, programs, token, language, onUpdateBooking, onManualCreate, currencyCode }) => {
+const BookingsView = ({ bookings, programs, token, language, onUpdateBooking, onManualCreate, currencyCode, capacityWeeks }) => {
   const t = translations[language];
   const [filters, setFilters] = useState({ status: "all", programId: "all", weekStart: "all", search: "" });
   const [selectedBooking, setSelectedBooking] = useState(null);
@@ -1406,7 +1477,7 @@ const BookingsView = ({ bookings, programs, token, language, onUpdateBooking, on
         </CardContent>
       </Card>
       <BookingDetailDialog booking={selectedBooking} currencyCode={currencyCode} language={language} onClose={() => setSelectedBooking(null)} onSave={onUpdateBooking} token={token} />
-      <ManualBookingDialog language={language} onClose={() => setManualOpen(false)} onCreate={onManualCreate} open={manualOpen} programs={programs} />
+      <ManualBookingDialog capacityWeeks={capacityWeeks} language={language} onClose={() => setManualOpen(false)} onCreate={onManualCreate} open={manualOpen} programs={programs} />
     </div>
   );
 };
@@ -2058,6 +2129,7 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
               {currentSection === "bookings" && (
                 <BookingsView
                   bookings={bookings}
+                  capacityWeeks={capacityWeeks}
                   currencyCode={config?.currency || "USD"}
                   language={language}
                   onManualCreate={createManualBooking}
