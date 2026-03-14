@@ -1374,6 +1374,11 @@ async def shutdown_db_client() -> None:
     client.close()
 
 
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
+
 @api_router.get("/")
 async def root() -> Dict[str, str]:
     return {"message": "PAWS TRAINING API is running."}
