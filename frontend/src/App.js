@@ -1463,21 +1463,49 @@ const ManualBookingDialog = ({ open, onClose, programs, onCreate, language, capa
 const DashboardView = ({ dashboard, language, currencyCode }) => {
   const t = translations[language];
   if (!dashboard) return null;
+  const m = dashboard.metrics;
+  const balanceOutstanding = m.total_balance_expected - m.total_balance_collected;
+  const depositOutstanding = m.total_deposit_expected - m.total_deposit_collected;
   return (
     <div className="grid gap-6" data-testid="admin-dashboard-view">
       <div className="grid gap-4 xl:grid-cols-4 md:grid-cols-2">
-        <MetricCard subtitle={t.weeklyOccupancy} testId="metric-nearly-full-weeks" title={t.nearlyFullWeeks} value={dashboard.metrics.nearly_full_weeks} />
-        <MetricCard subtitle={t.weeklyOccupancy} testId="metric-full-weeks" title={t.fullWeeks} value={dashboard.metrics.full_weeks} />
-        <MetricCard subtitle={t.bookings} testId="metric-dogs-pending-intake" title={t.dogsPendingIntake} value={dashboard.metrics.dogs_pending_intake} />
-        <MetricCard subtitle={t.bookings} testId="metric-dogs-in-training" title={t.dogsInTraining} value={dashboard.metrics.dogs_in_training} />
-        <MetricCard subtitle={t.bookings} testId="metric-dogs-delivered" title={t.dogsDelivered} value={dashboard.metrics.dogs_delivered} />
-        <MetricCard subtitle={t.finance} testId="metric-deposits-pending" title={t.depositsPending} value={dashboard.metrics.deposits_pending} />
-        <MetricCard subtitle={t.finance} testId="metric-paid-in-full" title={t.paidInFull} value={dashboard.metrics.paid_in_full} />
-        <MetricCard subtitle={t.finance} testId="metric-deposit-collected" title={t.depositCollected} value={formatCurrency(dashboard.metrics.total_deposit_collected, language, currencyCode)} />
-        <MetricCard subtitle={t.finance} testId="metric-balance-pending" title={t.balancePendingMetric} value={formatCurrency(dashboard.metrics.total_balance_expected - dashboard.metrics.total_balance_collected, language, currencyCode)} />
-        <MetricCard subtitle={t.finance} testId="metric-confirmed-revenue" title={t.confirmedRevenue} value={formatCurrency(dashboard.metrics.confirmed_revenue, language, currencyCode)} />
-        <MetricCard subtitle={t.finance} testId="metric-pending-revenue" title={t.pendingRevenueMetric} value={formatCurrency(dashboard.metrics.pending_revenue, language, currencyCode)} />
+        <MetricCard subtitle={t.weeklyOccupancy} testId="metric-nearly-full-weeks" title={t.nearlyFullWeeks} value={m.nearly_full_weeks} />
+        <MetricCard subtitle={t.weeklyOccupancy} testId="metric-full-weeks" title={t.fullWeeks} value={m.full_weeks} />
+        <MetricCard subtitle={t.bookings} testId="metric-dogs-pending-intake" title={t.dogsPendingIntake} value={m.dogs_pending_intake} />
+        <MetricCard subtitle={t.bookings} testId="metric-dogs-in-training" title={t.dogsInTraining} value={m.dogs_in_training} />
+        <MetricCard subtitle={t.bookings} testId="metric-dogs-delivered" title={t.dogsDelivered} value={m.dogs_delivered} />
+        <MetricCard subtitle={t.finance} testId="metric-deposits-pending" title={t.depositsPending} value={m.deposits_pending} />
+        <MetricCard subtitle={t.finance} testId="metric-paid-in-full" title={t.paidInFull} value={m.paid_in_full} />
+        <MetricCard subtitle={t.finance} testId="metric-confirmed-revenue" title={t.confirmedRevenue} value={formatCurrency(m.confirmed_revenue, language, currencyCode)} />
       </div>
+
+      <Card className="surface-panel rounded-[1.75rem] border-white/10" data-testid="financial-summary-card">
+        <CardHeader>
+          <CardTitle className="text-white">{t.financialSummary}</CardTitle>
+          <CardDescription className="text-zinc-400">{t.financialSummaryDesc}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-4">
+            <div className="rounded-2xl border border-green-500/20 bg-green-500/5 p-4" data-testid="fin-deposit-collected">
+              <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{t.depositCollected}</p>
+              <p className="mt-2 text-2xl font-bold text-green-400">{formatCurrency(m.total_deposit_collected, language, currencyCode)}</p>
+            </div>
+            <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4" data-testid="fin-final-collected">
+              <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{t.finalPaymentsCollected}</p>
+              <p className="mt-2 text-2xl font-bold text-blue-400">{formatCurrency(m.total_balance_collected, language, currencyCode)}</p>
+            </div>
+            <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-4" data-testid="fin-balance-outstanding">
+              <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{t.balancePendingMetric}</p>
+              <p className="mt-2 text-2xl font-bold text-yellow-400">{formatCurrency(balanceOutstanding + depositOutstanding, language, currencyCode)}</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4" data-testid="fin-total-revenue">
+              <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{t.totalRevenueCollected}</p>
+              <p className="mt-2 text-2xl font-bold text-white">{formatCurrency(m.total_revenue_collected, language, currencyCode)}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-6 xl:grid-cols-3">
         {[{ key: "capacity_breakdown", title: t.capacityBreakdown }, { key: "dog_status_breakdown", title: t.dogStatusBreakdown }].map((chart, chartIndex) => (
           <Card className="surface-panel rounded-[1.75rem] border-white/10" data-testid={`pie-chart-${chart.key}`} key={chart.key}>
@@ -1503,19 +1531,20 @@ const DashboardView = ({ dashboard, language, currencyCode }) => {
         ))}
         <Card className="surface-panel rounded-[1.75rem] border-white/10" data-testid="bar-chart-revenue">
           <CardHeader>
-            <CardTitle className="text-white">{t.revenueByMonth}</CardTitle>
+            <CardTitle className="text-white">{t.paymentBreakdownChart}</CardTitle>
           </CardHeader>
           <CardContent>
             <MeasuredChart>
               {({ width, height }) => (
-              <BarChart data={dashboard.charts.revenue} height={height} width={width}>
+              <BarChart data={dashboard.charts.payment_breakdown} height={height} width={width}>
                 <CartesianGrid stroke="rgba(255,255,255,0.08)" />
                 <XAxis dataKey="month" stroke="#a1a1aa" />
                 <YAxis stroke="#a1a1aa" tickFormatter={(value) => formatCurrency(value, language, currencyCode)} />
                 <Tooltip formatter={(value) => formatCurrency(value, language, currencyCode)} />
                 <Legend />
-                <Bar dataKey="confirmed" fill="#22c55e" radius={[8, 8, 0, 0]} />
-                <Bar dataKey="pending" fill="#dc2626" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="deposits" fill="#22c55e" name={t.depositsChartLabel} radius={[8, 8, 0, 0]} />
+                <Bar dataKey="final_payments" fill="#3b82f6" name={t.finalPaymentsChartLabel} radius={[8, 8, 0, 0]} />
+                <Bar dataKey="outstanding" fill="#eab308" name={t.outstandingChartLabel} radius={[8, 8, 0, 0]} />
               </BarChart>
               )}
             </MeasuredChart>

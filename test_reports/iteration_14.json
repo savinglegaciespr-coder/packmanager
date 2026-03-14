@@ -1,0 +1,76 @@
+{
+  "summary": "Enhanced financial dashboard testing complete. All features verified: Backend 8/8 tests passed (100%), Frontend UI verified via Playwright. Dashboard shows Financial Summary card with 4 colored boxes, Payment Breakdown chart with 3 bars, metric cards for deposits/paid/revenue. Deposit-verified email contains non-refundable policy notice and secure /payment/{token} upload link.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_dashboard_financial_metrics.py",
+    "/app/test_reports/pytest/pytest_dashboard_financial.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_dashboard_financial_metrics.py"
+  ],
+  "success_rate": {
+    "backend": "100% (8/8 tests passed)",
+    "frontend": "100% (all UI elements verified)"
+  },
+  "test_credentials": {
+    "admin_email": "admin@pawstraining.com",
+    "admin_password": "PawsAdmin2026!"
+  },
+  "seed_data_creation": "Used existing seed data from previous iterations",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Financial dashboard enhancements fully verified. Key endpoints: GET /api/admin/dashboard returns metrics with total_deposit_collected, total_balance_collected, total_revenue_collected, total_deposit_expected, total_balance_expected. Charts include payment_breakdown array with monthly deposits, final_payments, outstanding values. Deposit-verified email (triggered when payment_status=Verified) includes AVISO IMPORTANTE/IMPORTANT NOTICE with non-refundable policy and /payment/{token} link.",
+  "verified_features": {
+    "dashboard_metrics": {
+      "total_deposit_collected": "Sum of deposits from bookings with payment_status=Verified",
+      "total_balance_collected": "Sum of balances from bookings with final_payment_status=Verified",
+      "total_revenue_collected": "deposit_collected + balance_collected",
+      "total_deposit_expected": "Sum of all expected deposits from active bookings",
+      "total_balance_expected": "Sum of all expected balances from active bookings",
+      "deposits_pending": "Count of bookings with overall_payment_status=Deposit Pending",
+      "paid_in_full": "Count of bookings with overall_payment_status=Paid in Full"
+    },
+    "dashboard_charts": {
+      "payment_breakdown": "Array of {month, deposits, final_payments, outstanding} for bar chart",
+      "capacity_breakdown": "Pie chart: Confirmed, Reserved, Remaining slots",
+      "dog_status_breakdown": "Pie chart: status counts (In Training, Delivered, etc.)"
+    },
+    "frontend_financial_summary_card": {
+      "deposits_collected_box": "Green border/bg, shows $total_deposit_collected",
+      "final_payments_box": "Blue border/bg, shows $total_balance_collected",
+      "outstanding_box": "Yellow border/bg, shows outstanding = expected - collected",
+      "total_revenue_box": "White border/bg, shows $total_revenue_collected"
+    },
+    "payment_breakdown_chart": {
+      "title": "Desglose de pagos por mes / Payment breakdown by month",
+      "bars": "3 colored bars - deposits (green), final_payments (blue), outstanding (yellow)"
+    },
+    "booking_detail_dialog": {
+      "deposit_amount": "Shown in program summary section",
+      "balance_amount": "Shown in program summary section",
+      "overall_payment_status": "Badge showing Deposit Pending/Verified, Balance Pending, or Paid in Full"
+    },
+    "reservations_table": {
+      "overall_payment_status_column": "Shows payment status badge for each booking"
+    },
+    "deposit_verified_email": {
+      "spanish_policy": "AVISO IMPORTANTE: El depósito no es reembolsable una vez procesado...",
+      "english_policy": "IMPORTANT NOTICE: The deposit is non-refundable once processed...",
+      "payment_link": "Contains /payment/{token} URL for final payment upload"
+    }
+  },
+  "screenshots": [
+    "/app/test_reports/iteration14_dashboard_financial.jpeg - Dashboard with Financial Summary card and Payment Breakdown chart",
+    "/app/test_reports/iteration14_booking_detail.jpeg - Booking detail dialog showing deposit_amount and balance_amount"
+  ]
+}

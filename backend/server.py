@@ -1126,22 +1126,30 @@ async def send_deposit_verified_email(booking: Dict[str, Any]) -> None:
     payment_link = f"{frontend_url}/payment/{token}" if token else ""
     program_name = booking["program_name_en"] if locale == "en" else booking["program_name_es"]
 
+    deposit_label = format_money(amounts["deposit_amount"], currency)
+
     if locale == "en":
         subject = "PAWS TRAINING — Deposit verified"
         body = (
             f"Hi {booking['owner']['full_name']},\n\n"
-            f"Your deposit for {booking['dog']['name']} ({program_name}) has been verified.\n\n"
+            f"Your deposit of {deposit_label} for {booking['dog']['name']} ({program_name}) has been verified.\n\n"
             f"Remaining balance: {balance_label}.\n\n"
             f"Please upload your final payment proof using this secure link:\n{payment_link}\n\n"
+            f"IMPORTANT NOTICE:\n"
+            f"The deposit is non-refundable once processed. If the client cancels the reservation "
+            f"or requests a date change, a new deposit will be required to secure a new training date.\n\n"
             f"Thank you for choosing PAWS TRAINING."
         )
     else:
         subject = "PAWS TRAINING — Depósito verificado"
         body = (
             f"Hola {booking['owner']['full_name']},\n\n"
-            f"Tu depósito para {booking['dog']['name']} ({program_name}) ha sido verificado.\n\n"
+            f"Tu depósito de {deposit_label} para {booking['dog']['name']} ({program_name}) ha sido verificado.\n\n"
             f"Saldo pendiente: {balance_label}.\n\n"
             f"Por favor sube tu comprobante de pago final usando este enlace seguro:\n{payment_link}\n\n"
+            f"AVISO IMPORTANTE:\n"
+            f"El depósito no es reembolsable una vez procesado. Si el cliente cancela la reserva "
+            f"o solicita un cambio de fecha, se requerirá un nuevo depósito para asegurar una nueva fecha de entrenamiento.\n\n"
             f"Gracias por confiar en PAWS TRAINING."
         )
     await queue_email(booking["owner"]["email"], subject, body, audience="client", booking_id=booking["id"], locale=locale)
@@ -1213,6 +1221,7 @@ async def build_dashboard_payload() -> Dict[str, Any]:
 
     dog_status_breakdown: Dict[str, int] = {}
     revenue_summary: Dict[str, Dict[str, float]] = {}
+    payment_summary: Dict[str, Dict[str, float]] = {}
     pending_payments = 0
     confirmed_payments = 0
     deposits_pending = 0
@@ -1260,10 +1269,19 @@ async def build_dashboard_payload() -> Dict[str, Any]:
             amounts = compute_deposit_amounts(price, snapshot.get("deposit_type", "percentage"), snapshot.get("deposit_value", 100.0))
             total_deposit_expected += amounts["deposit_amount"]
             total_balance_expected += amounts["balance_amount"]
+            payment_summary.setdefault(month_key, {"deposits": 0.0, "final_payments": 0.0, "outstanding": 0.0})
             if booking.get("payment_status") == "Verified":
                 total_deposit_collected += amounts["deposit_amount"]
+                payment_summary[month_key]["deposits"] += amounts["deposit_amount"]
             if booking.get("final_payment_status") == "Verified":
                 total_balance_collected += amounts["balance_amount"]
+                payment_summary[month_key]["final_payments"] += amounts["balance_amount"]
+            outstanding = 0.0
+            if booking.get("payment_status") != "Verified":
+                outstanding += amounts["deposit_amount"]
+            if booking.get("final_payment_status") != "Verified":
+                outstanding += amounts["balance_amount"]
+            payment_summary[month_key]["outstanding"] += outstanding
         if booking["status"] in {"Approved", "Scheduled"}:
             pending_intake += 1
         if booking["status"] == "In Training":
@@ -1301,6 +1319,7 @@ async def build_dashboard_payload() -> Dict[str, Any]:
             "total_deposit_collected": round(total_deposit_collected, 2),
             "total_balance_expected": round(total_balance_expected, 2),
             "total_balance_collected": round(total_balance_collected, 2),
+            "total_revenue_collected": round(total_deposit_collected + total_balance_collected, 2),
             "confirmed_revenue": round(confirmed_revenue_total, 2),
             "pending_revenue": round(pending_revenue_total, 2),
         },
@@ -1315,6 +1334,10 @@ async def build_dashboard_payload() -> Dict[str, Any]:
             "revenue": [
                 {"month": key, "confirmed": round(value["confirmed"], 2), "pending": round(value["pending"], 2)}
                 for key, value in sorted(revenue_summary.items())
+            ],
+            "payment_breakdown": [
+                {"month": key, "deposits": round(value["deposits"], 2), "final_payments": round(value["final_payments"], 2), "outstanding": round(value["outstanding"], 2)}
+                for key, value in sorted(payment_summary.items())
             ],
         },
         "recent_email_logs": email_logs,
