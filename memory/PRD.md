@@ -108,6 +108,19 @@ Core business rules:
 - Verified all 4 email flows work: new booking (admin + client), approval, rejection — all via real Gmail SMTP
 - Testing agent confirmed 100% pass rate (7/7 backend tests, all frontend elements functional)
 
+### 2026-03-14 (continued)
+- Implemented two-stage payment system: Deposit (existing payment_proof/payment_status) + Final Payment (new final_payment_proof/final_payment_status)
+- Added computed overall_payment_status: Deposit Pending → Deposit Verified → Balance Pending → Paid in Full
+- Admin booking dialog: separate deposit/final payment verification controls, final payment proof upload, overall payment badge
+- Reservations table: overall_payment_status badge column replaces old single docs column
+- Dashboard metrics: deposits_pending, deposits_verified, balance_pending, paid_in_full
+- Weekly operations and operations screen views show overall_payment_status
+- Public booking form relabeled: "Comprobante de depósito" / "Deposit proof"
+- Admin can upload final payment proof via POST /api/admin/bookings/{id}/final-payment-proof
+- Migration backfills existing bookings with final_payment_status: "Pending Review"
+- Bilingual translations (ES/EN) for all new labels and status values
+- Testing agent: 100% pass (12/12 backend, all frontend verified)
+
 ## Prioritized Backlog
 1. Add richer chart drill-downs and exportable reporting
 2. Split large frontend file into smaller modules for maintainability
