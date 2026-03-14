@@ -156,6 +156,14 @@ Core business rules:
 - Bilingual translations for all new financial labels
 - Testing agent: 100% pass (8/8 backend, all frontend verified)
 
+### 2026-03-14 (deposit policy notice on booking form)
+- Added visible deposit policy notice (yellow box) above submit button on public booking form
+- Non-refundable deposit policy text in both ES/EN
+- Required checkbox: "Entiendo y acepto la política de depósito no reembolsable"
+- Submit button disabled until checkbox is checked
+- Form validation blocks submission if policy not accepted
+- Bilingual translations for policy title, text, and acceptance label
+
 ## Prioritized Backlog
 1. Add richer chart drill-downs and exportable reporting
 2. Split large frontend file into smaller modules for maintainability

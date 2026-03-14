@@ -572,6 +572,7 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
     start_week: "",
     payment_proof: null,
     vaccination_certificate: null,
+    accept_deposit_policy: false,
   });
 
   const maxDogBirthDate = useMemo(() => new Date().toISOString().split("T")[0], []);
@@ -642,6 +643,10 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
     }
     if (!formState.payment_proof || !formState.vaccination_certificate) {
       toast.error(language === "es" ? "Debes cargar ambos documentos." : "Both files are required.");
+      return;
+    }
+    if (!formState.accept_deposit_policy) {
+      toast.error(language === "es" ? "Debes aceptar la política de depósito." : "You must accept the deposit policy.");
       return;
     }
     setSubmitting(true);
@@ -905,7 +910,15 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
                   <input accept=".pdf,image/*" data-testid="vaccination-certificate-input" onChange={(event) => updateField("vaccination_certificate", event.target.files?.[0] || null)} required type="file" />
                 </div>
               </section>
-              <Button className="rounded-full bg-primary text-white hover:bg-red-700" data-testid="submit-booking-button" disabled={submitting} type="submit">
+              <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-5" data-testid="deposit-policy-notice">
+                <p className="text-sm font-semibold text-yellow-200">{t.depositPolicyTitle}</p>
+                <p className="mt-2 text-sm text-yellow-200/80">{t.depositPolicyText}</p>
+                <label className="mt-4 flex cursor-pointer items-start gap-3" data-testid="deposit-policy-checkbox-label">
+                  <input checked={formState.accept_deposit_policy} className="mt-0.5 h-5 w-5 accent-red-500" data-testid="deposit-policy-checkbox" onChange={(event) => updateField("accept_deposit_policy", event.target.checked)} type="checkbox" />
+                  <span className="text-sm text-zinc-200">{t.depositPolicyAccept}</span>
+                </label>
+              </div>
+              <Button className="rounded-full bg-primary text-white hover:bg-red-700" data-testid="submit-booking-button" disabled={submitting || !formState.accept_deposit_policy} type="submit">
                 {submitting ? "..." : t.submitBooking}
               </Button>
             </form>
