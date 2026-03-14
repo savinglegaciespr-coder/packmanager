@@ -39,7 +39,7 @@ Core business rules:
 
 ## User Choices
 - Initial admin login: safe default demo admin
-- Email handling: full notification workflow implemented, outgoing emails logged internally until SMTP is added later
+- Email handling: Gmail SMTP fully configured and working
 - Logo: temporary placeholder now, swappable logo support included
 - Language priority: Spanish-first with English toggle
 
@@ -49,7 +49,7 @@ Core business rules:
 - **Database:** MongoDB with string UUID identifiers to avoid ObjectId serialization issues
 - **Storage:** protected local file storage for uploaded documents and brand logo assets
 - **Business Config Layer:** settings document drives business name, slogan, contact details, notification email, terminology, colors, and logo
-- **Email Workflow:** branded internal email log collection used for booking submitted / approved / rejected notifications
+- **Email Workflow:** Gmail SMTP delivery for booking submitted / approved / rejected notifications
 - **Capacity Engine:** week-based occupancy calculations across single-week and multi-week programs with automatic stale pending expiry
 
 ## User Personas
@@ -68,13 +68,13 @@ Core business rules:
 - seeded launch data for March 30 and April 6, 2026
 - branded notification workflow for booking submitted / approved / rejected
 
-## What’s Been Implemented
+## What's Been Implemented
 ### 2026-03-11
 - Built bilingual public landing page with premium dark styling, responsive layout, language toggle, hero, programs, process, and contact sections
 - Built full public booking flow with live weekly availability, required uploads, and Pending Review reservation creation
 - Updated the public dog form to use Spanish-only wording for the key fields, removed manual age entry, and added automatic age calculation from the dog's birth date
 - Extended admin settings with configurable currency (USD/EUR/GBP) and dynamic landing content controls for hero copy, CTA labels, and the existing hero feature cards
-- Added a weekly operational view in admin capacity to show each week’s assigned dogs with booking/payment/vaccination statuses for faster operations review
+- Added a weekly operational view in admin capacity to show each week's assigned dogs with booking/payment/vaccination statuses for faster operations review
 - Replaced the floating Emergent badge with a natural footer for public/admin layouts and applied currency-aware formatting to prices, summaries, dashboard revenue, and price-related internal emails
 - Refined USD formatting to always use symbol-first values like $420 across the UI and emails, and added a dedicated separate admin view: Vista semanal / Weekly Operations
 - Added a second separate admin operational display mode: Modo Operaciones / Operations Screen, built for large screens/TVs with operational-only summary cards, grouped weekly dog assignments, and 30-second auto-refresh
@@ -90,10 +90,10 @@ Core business rules:
 - Improved public mobile booking form usability by applying mobile-friendly input types (email/tel/number) and tightening the booking-page header spacing so the form content sits higher on small screens
 - Hid admin access controls from the public interface for non-authenticated visitors, while keeping the direct `/admin/login` route available and preserving existing authentication logic
 - Replaced internal email logging mode with real Gmail SMTP delivery, added masked SMTP settings in admin configuration, and verified real send flows for booking submission, admin notification, approval, and rejection
-- Clarified the reservation review modal with explicit field labels and automatic read-only intake/delivery dates derived from the booking’s selected week and stored program duration
+- Clarified the reservation review modal with explicit field labels and automatic read-only intake/delivery dates derived from the booking's selected week and stored program duration
 - Replaced the booking week selector with a monthly visual calendar interface that reuses existing weekly capacity data, color-codes availability, and preserves the current booking/capacity logic across desktop and mobile
 - Added frontend-only email confirmation validation in the public booking form, including a confirm-email field, valid email format checks, and clear mismatch messaging without changing stored booking data
-- Standardized the vaccination declaration field across the public and manual booking forms as a simple yes/no selector labeled “Vacunas al día,” while preserving the separate certificate upload/review workflow
+- Standardized the vaccination declaration field across the public and manual booking forms as a simple yes/no selector labeled "Vacunas al día," while preserving the separate certificate upload/review workflow
 - Aligned the manual booking modal with the intended reservation workflow by using birth date as the editable age source, auto-calculating age/intake/delivery dates, and making derived date fields read-only
 - Updated manual booking week selection to reuse live weekly capacity data, visually mark unavailable weeks, and block manual reservations from exceeding configured weekly occupancy
 - Improved admin weekly capacity visibility by separating confirmed, pending, and available counts across dashboard occupancy, capacity management, and weekly operational views
@@ -102,6 +102,11 @@ Core business rules:
 - Added admin workspace with dashboard charts/metrics, bookings filters, detail dialog, document status controls, manual booking creation, programs management, capacity controls, settings, and email log view
 - Seeded demo admin, programs, weekly capacity override, sample bookings, and sample email logs for populated first launch experience
 - Added reusable regression coverage via backend tests and completed browser flow verification
+
+### 2026-03-14
+- Fixed email notification system: made send_email_via_smtp async (uses asyncio.to_thread for non-blocking SMTP), added detailed SMTP logging, backfilled old email logs with proper delivery_status field
+- Verified all 4 email flows work: new booking (admin + client), approval, rejection — all via real Gmail SMTP
+- Testing agent confirmed 100% pass rate (7/7 backend tests, all frontend elements functional)
 
 ## Prioritized Backlog
 1. Add richer chart drill-downs and exportable reporting
@@ -112,7 +117,7 @@ Core business rules:
 
 ## Remaining Features by Priority
 ### P0
-- None for MVP scope
+- None for MVP scope — all core features implemented and working
 
 ### P1
 - Modularize frontend/admin components into smaller files
@@ -120,11 +125,11 @@ Core business rules:
 - Add better empty states and bulk admin actions
 
 ### P2
-- SMTP credential entry + real email sending
-- richer analytics filters and CSV exports
-- additional white-label business presets for other service businesses
+- Richer analytics filters and CSV exports
+- Additional white-label business presets for other service businesses
+- Refactor backend/server.py into modular routers
 
 ## Next Tasks List
 - Keep the seeded demo data stable while real branding content is added
 - Replace placeholder logo with final uploaded brand asset when available
-- Optional next phase: real SMTP delivery, modular refactor, and expanded admin reporting
+- Optional next phase: modular refactor and expanded admin reporting
