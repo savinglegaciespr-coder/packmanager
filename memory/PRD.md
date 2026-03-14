@@ -164,6 +164,15 @@ Core business rules:
 - Form validation blocks submission if policy not accepted
 - Bilingual translations for policy title, text, and acceptance label
 
+### 2026-03-14 (mobile file upload preview fix)
+- Added HEIC/HEIF file support: auto-converts to JPEG during upload using pillow-heif for browser compatibility
+- Updated save_upload to store content_type in file info dict
+- Document endpoint returns FileResponse with explicit media_type from stored content_type or extension fallback
+- Frontend image preview: images open in an overlay modal with close button instead of new tab
+- Frontend PDF preview: PDFs open in new browser tab for viewing
+- Installed pillow + pillow-heif packages
+- Testing agent: 100% pass (8/8 backend, all frontend verified)
+
 ## Prioritized Backlog
 1. Add richer chart drill-downs and exportable reporting
 2. Split large frontend file into smaller modules for maintainability
