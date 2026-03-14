@@ -251,8 +251,17 @@ export const openProtectedDocument = async (token, bookingId, documentType) => {
     throw new Error(errorPayload.detail || "Unable to open document.");
   }
 
+  const contentType = response.headers.get("content-type") || "";
   const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
+  const blobWithType = new Blob([blob], { type: contentType });
+  const url = URL.createObjectURL(blobWithType);
+
+  if (contentType.startsWith("image/")) {
+    // Return info for the preview modal instead of opening a new tab
+    return { type: "image", url, contentType };
+  }
+  // PDFs and other files: open in new tab
   window.open(url, "_blank", "noopener,noreferrer");
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+  return { type: "other", url };
 };

@@ -44,6 +44,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   UploadCloud,
+  X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1126,6 +1127,7 @@ const BookingDetailDialog = ({ booking, language, onClose, onSave, token, curren
   const t = translations[language];
   const [formState, setFormState] = useState(null);
   const [uploadingFinal, setUploadingFinal] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
 
   useEffect(() => {
     if (booking) {
@@ -1170,6 +1172,17 @@ const BookingDetailDialog = ({ booking, language, onClose, onSave, token, curren
     }
   };
 
+  const handleDocPreview = async (documentType) => {
+    try {
+      const result = await openProtectedDocument(token, booking.id, documentType);
+      if (result?.type === "image") {
+        setPreviewImage(result.url);
+      }
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
   return (
     <Dialog onOpenChange={(open) => !open && onClose()} open={Boolean(booking)}>
       <DialogContent aria-describedby="booking-detail-description" className="mobile-dialog-content max-w-4xl border-white/10 bg-zinc-950 text-white" data-testid="booking-detail-dialog">
@@ -1208,16 +1221,16 @@ const BookingDetailDialog = ({ booking, language, onClose, onSave, token, curren
             <div className="space-y-2">
               <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{t.documents}</p>
               <div className="grid gap-2 sm:grid-cols-2">
-                <Button className="touch-button rounded-full" data-testid="open-payment-proof-button" onClick={() => openProtectedDocument(token, booking.id, "payment_proof")} type="button" variant="outline">
+                <Button className="touch-button rounded-full" data-testid="open-payment-proof-button" onClick={() => handleDocPreview("payment_proof")} type="button" variant="outline">
                   <FileText className="mr-2 h-4 w-4" /> {t.depositProofField}
                 </Button>
-                <Button className="touch-button rounded-full" data-testid="open-certificate-button" onClick={() => openProtectedDocument(token, booking.id, "vaccination_certificate")} type="button" variant="outline">
+                <Button className="touch-button rounded-full" data-testid="open-certificate-button" onClick={() => handleDocPreview("vaccination_certificate")} type="button" variant="outline">
                   <ShieldCheck className="mr-2 h-4 w-4" /> {t.vaccinationCertificate}
                 </Button>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
                 {booking.final_payment_proof ? (
-                  <Button className="touch-button rounded-full" data-testid="open-final-payment-proof-button" onClick={() => openProtectedDocument(token, booking.id, "final_payment_proof")} type="button" variant="outline">
+                  <Button className="touch-button rounded-full" data-testid="open-final-payment-proof-button" onClick={() => handleDocPreview("final_payment_proof")} type="button" variant="outline">
                     <CreditCard className="mr-2 h-4 w-4" /> {t.finalPaymentProofField}
                   </Button>
                 ) : (
@@ -1285,6 +1298,16 @@ const BookingDetailDialog = ({ booking, language, onClose, onSave, token, curren
           </div>
         </div>
       </DialogContent>
+      {previewImage && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 p-4" data-testid="image-preview-overlay" onClick={() => { URL.revokeObjectURL(previewImage); setPreviewImage(null); }}>
+          <div className="relative max-h-[90vh] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
+            <button className="absolute -right-3 -top-3 flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 text-white hover:bg-zinc-700" data-testid="close-preview-button" onClick={() => { URL.revokeObjectURL(previewImage); setPreviewImage(null); }}>
+              <X className="h-4 w-4" />
+            </button>
+            <img alt="Document preview" className="max-h-[85vh] max-w-full rounded-xl object-contain" data-testid="image-preview-img" src={previewImage} />
+          </div>
+        </div>
+      )}
     </Dialog>
   );
 };

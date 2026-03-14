@@ -56,7 +56,7 @@ ACTIVE_CAPACITY_STATUSES = {"Pending Review", "Approved", "Scheduled", "In Train
 CONFIRMED_CAPACITY_STATUSES = {"Approved", "Scheduled", "In Training", "Delivered"}
 DOC_STATUS_VALUES = {"Pending Review", "Verified", "Invalid"}
 ELIGIBILITY_VALUES = {"Pending Review", "Eligible", "Ineligible"}
-ALLOWED_UPLOAD_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".webp"}
+ALLOWED_UPLOAD_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".webp", ".heic", ".heif"}
 CURRENCY_OPTIONS = {
     "USD": {"symbol": "$", "label": "$ USD"},
     "EUR": {"symbol": "€", "label": "€ EUR"},
@@ -977,6 +977,25 @@ async def save_upload(upload: UploadFile, directory: Path, prefix: str) -> Dict[
     if not content:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
+    content_type = upload.content_type or "application/octet-stream"
+
+    # Convert HEIC/HEIF to JPEG for browser compatibility
+    if suffix in {".heic", ".heif"}:
+        try:
+            from io import BytesIO
+            from PIL import Image
+            import pillow_heif
+            pillow_heif.register_heif_opener()
+            img = Image.open(BytesIO(content))
+            buf = BytesIO()
+            img.convert("RGB").save(buf, format="JPEG", quality=90)
+            content = buf.getvalue()
+            suffix = ".jpg"
+            content_type = "image/jpeg"
+            logger.info("Converted HEIC/HEIF to JPEG for %s", upload.filename)
+        except Exception:
+            logger.exception("HEIC conversion failed for %s, storing original", upload.filename)
+
     stored_name = f"{prefix}-{uuid.uuid4().hex}{suffix}"
     path = directory / stored_name
     path.write_bytes(content)
@@ -984,7 +1003,7 @@ async def save_upload(upload: UploadFile, directory: Path, prefix: str) -> Dict[
         "original_name": upload.filename,
         "stored_name": stored_name,
         "path": str(path),
-        "content_type": upload.content_type,
+        "content_type": content_type,
         "size": len(content),
     }
 
@@ -1805,7 +1824,12 @@ async def get_document(booking_id: str, document_type: str, _: Dict[str, Any] = 
     document = booking.get(document_type)
     if not document or not document.get("path") or not Path(document["path"]).exists():
         raise HTTPException(status_code=404, detail="Document not available.")
-    return FileResponse(Path(document["path"]), filename=document.get("original_name"))
+    file_path = Path(document["path"])
+    media_type = document.get("content_type")
+    if not media_type:
+        ext = file_path.suffix.lower()
+        media_type = {".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}.get(ext, "application/octet-stream")
+    return FileResponse(file_path, media_type=media_type, filename=document.get("original_name"))
 
 
 @api_router.post("/admin/bookings/{booking_id}/final-payment-proof")

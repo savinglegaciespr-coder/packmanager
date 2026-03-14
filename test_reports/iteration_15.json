@@ -1,0 +1,61 @@
+{
+  "summary": "File upload preview testing complete. Backend: 8/8 tests passed (100%). All features verified: HEIC/HEIF extensions allowed, content_type stored in file info, correct Content-Type headers returned for JPEG (image/jpeg) and PDF (application/pdf). Frontend: Image preview modal (data-testid=image-preview-overlay) works correctly for images, PDFs open in new tab, close button and background click both close modal. Deposit policy notice and checkbox work correctly in booking form.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_file_upload_preview.py",
+    "/app/test_reports/pytest/pytest_file_upload.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_file_upload_preview.py"
+  ],
+  "success_rate": {
+    "backend": "100% (8/8 tests passed)",
+    "frontend": "100% (all UI elements verified)"
+  },
+  "test_credentials": {
+    "admin_email": "admin@pawstraining.com",
+    "admin_password": "PawsAdmin2026!"
+  },
+  "seed_data_creation": "Created test bookings with JPEG and PDF uploads: TEST_ImageUpload User (JPEG payment proof, PDF vaccination cert), TEST_PDFUpload User (PDF payment proof, JPEG vaccination cert)",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "File upload and preview features fully verified. Key findings: 1) HEIC/HEIF extensions are in ALLOWED_UPLOAD_EXTENSIONS and auto-converted to JPEG via pillow-heif 2) save_upload stores content_type in file info dict 3) GET /api/admin/documents/{id}/{type} returns FileResponse with explicit media_type from stored content_type or file extension fallback 4) Frontend openProtectedDocument returns {type: 'image', url} for images which triggers previewImage state in BookingDetailDialog 5) Image preview modal (data-testid=image-preview-overlay) appears with img tag, close button (data-testid=close-preview-button), clicking background also closes 6) PDFs open in new tab via window.open 7) Booking form has deposit policy notice (data-testid=deposit-policy-notice) and checkbox (data-testid=deposit-policy-checkbox) that must be checked to enable submit button.",
+  "verified_features": {
+    "backend_upload": {
+      "heic_heif_allowed": "Extensions .heic, .heif added to ALLOWED_UPLOAD_EXTENSIONS line 59",
+      "heic_conversion": "pillow-heif converts HEIC/HEIF to JPEG with content_type=image/jpeg",
+      "content_type_storage": "save_upload stores content_type in returned file info dict",
+      "document_preview_api": "GET /api/admin/documents/{id}/{type} returns FileResponse with media_type from stored content_type"
+    },
+    "frontend_preview": {
+      "image_preview_modal": {
+        "overlay": "data-testid=image-preview-overlay, z-200 fixed overlay",
+        "img_element": "data-testid=image-preview-img with blob URL",
+        "close_button": "data-testid=close-preview-button, X icon, calls setPreviewImage(null)",
+        "background_close": "Clicking overlay background also closes modal"
+      },
+      "pdf_behavior": "PDFs open in new tab via window.open, no modal",
+      "api_function": "openProtectedDocument returns {type: 'image', url} for images"
+    },
+    "booking_form": {
+      "deposit_policy_notice": "data-testid=deposit-policy-notice with bilingual text",
+      "deposit_policy_checkbox": "data-testid=deposit-policy-checkbox, must be checked to submit",
+      "submit_button_disabled": "Button disabled until checkbox checked"
+    }
+  },
+  "screenshots": [
+    "/app/test_reports/iteration15_booking_dialog_with_docs.jpeg - Booking dialog with document buttons",
+    "/app/test_reports/iteration15_image_preview_modal.jpeg - Image preview modal open",
+    "/app/test_reports/iteration15_deposit_policy_section.jpeg - Deposit policy notice and checkbox"
+  ]
+}
