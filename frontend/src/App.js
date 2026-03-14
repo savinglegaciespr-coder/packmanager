@@ -1362,7 +1362,7 @@ const DashboardView = ({ dashboard, language, currencyCode }) => {
                 <div className="text-right">
                   <Badge className={getStatusStyles(week.availability_label)}>{t.status[week.availability_label]}</Badge>
                   <p className="mt-2 text-sm text-zinc-300">
-                    {week.occupied}/{week.capacity} {t.occupiedLabel} · {week.remaining} {t.remainingLabel}
+                    {t.confirmedLabel}: {week.confirmed} · {t.pendingLabel}: {week.reserved} · {t.availableLabel}: {week.remaining}
                   </p>
                 </div>
               </div>
@@ -1581,7 +1581,7 @@ const CapacityView = ({ capacityWeeks, language, onSaveCapacity }) => {
           <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 md:grid-cols-[1fr_100px_150px] md:items-center" data-testid={`capacity-row-${week.week_start}`} key={week.week_start}>
             <div>
               <p className="font-semibold text-white">{week.label}</p>
-              <p className="text-sm text-zinc-500">{week.occupied} {t.occupiedLabel} · {week.remaining} {t.remainingLabel}</p>
+              <p className="text-sm text-zinc-500">{t.confirmedLabel}: {week.confirmed} · {t.pendingLabel}: {week.reserved} · {t.availableLabel}: {week.remaining}</p>
             </div>
             <Input data-testid={`capacity-input-${week.week_start}`} onChange={(event) => setDrafts((current) => ({ ...current, [week.week_start]: event.target.value }))} type="number" value={drafts[week.week_start] ?? week.capacity} />
             <Button className="touch-button rounded-full bg-primary text-white hover:bg-red-700" data-testid={`capacity-save-${week.week_start}`} onClick={() => onSaveCapacity(week.week_start, Number(drafts[week.week_start] ?? week.capacity))} type="button">
@@ -1621,6 +1621,7 @@ const WeeklyOperationsView = ({ bookings, capacityWeeks, language }) => {
               <div>
                 <p className="font-semibold text-white">{formatDisplayDate(week.week_start, language)}</p>
                 <p className="text-sm text-zinc-500">{week.week_start}</p>
+                <p className="mt-2 text-sm text-zinc-400">{t.confirmedLabel}: {week.confirmed} · {t.pendingLabel}: {week.reserved} · {t.availableLabel}: {week.remaining}</p>
               </div>
               <Badge className={getStatusStyles(week.availability_label)}>{week.dogs.length} {language === "es" ? "perros" : "dogs"}</Badge>
             </div>
@@ -1734,9 +1735,10 @@ const OperationsScreenView = ({ bookings, capacityWeeks, dashboard, language, la
                   <div>
                     <p className="text-2xl font-semibold text-white">{formatDisplayDate(week.week_start, language)}</p>
                     <p className="mt-1 text-sm text-zinc-500">{week.week_start}</p>
+                    <p className="mt-3 text-sm text-zinc-300">{t.confirmedLabel}: {week.confirmed} · {t.pendingLabel}: {week.reserved} · {t.availableLabel}: {week.remaining}</p>
                   </div>
                   <div className="flex flex-wrap gap-3 text-sm">
-                    <Badge className="border-white/10 bg-white/5 px-4 py-2 text-zinc-200">{week.remaining} {t.remainingLabel}</Badge>
+                    <Badge className="border-white/10 bg-white/5 px-4 py-2 text-zinc-200">{t.availableLabel}: {week.remaining}</Badge>
                     <Badge className={`${getStatusStyles(week.availability_label)} px-4 py-2`}>{t.status[week.availability_label]}</Badge>
                   </div>
                 </div>
