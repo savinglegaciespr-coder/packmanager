@@ -147,6 +147,15 @@ Core business rules:
 - FRONTEND_URL env var added for email link generation
 - Testing agent: 100% pass (10/10 backend, all frontend verified)
 
+### 2026-03-14 (financial dashboard + email policy)
+- Enhanced financial dashboard with dedicated Financial Summary card: 4 colored boxes (Deposits collected green, Final payments blue, Outstanding yellow, Total revenue white)
+- Replaced revenue chart with Payment Breakdown chart: 3 colored bars per month (deposits, final payments, outstanding)
+- Added total_revenue_collected metric (deposit_collected + balance_collected)
+- Added per-month payment tracking (payment_summary) in dashboard data
+- Updated deposit-verified email: includes non-refundable deposit policy notice (ES: "AVISO IMPORTANTE", EN: "IMPORTANT NOTICE") and secure /payment/{token} upload link
+- Bilingual translations for all new financial labels
+- Testing agent: 100% pass (8/8 backend, all frontend verified)
+
 ## Prioritized Backlog
 1. Add richer chart drill-downs and exportable reporting
 2. Split large frontend file into smaller modules for maintainability
