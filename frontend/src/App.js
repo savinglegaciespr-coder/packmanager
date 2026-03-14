@@ -823,6 +823,13 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
                 <p className="font-semibold">{t.bookingSubmitted}</p>
                 <p className="mt-2">ID: {bookingResult.booking_id}</p>
                 <p className="mt-1">{t.reservationSummaryPrice}: {formatCurrency(selectedProgram?.price, language, currencyCode)}</p>
+                {selectedProgram && (() => {
+                  const depType = selectedProgram.deposit_type || "percentage";
+                  const depVal = selectedProgram.deposit_value ?? 100;
+                  const dep = depType === "fixed" ? Math.min(depVal, selectedProgram.price) : Math.round(selectedProgram.price * depVal / 100 * 100) / 100;
+                  const bal = Math.round((selectedProgram.price - dep) * 100) / 100;
+                  return <p className="mt-1">{t.depositLabel}: {formatCurrency(dep, language, currencyCode)} · {t.balanceLabel}: {formatCurrency(bal, language, currencyCode)}</p>;
+                })()}
                 <p className="mt-1">
                   {t.reservationHeldUntil}: {bookingResult.reservation_expires_at}
                 </p>
@@ -1056,6 +1063,7 @@ const BookingDetailDialog = ({ booking, language, onClose, onSave, token, curren
               <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{t.programName}</p>
               <p className="mt-2 text-sm text-zinc-200">{language === "es" ? booking.program_name_es : booking.program_name_en}</p>
               <p className="text-sm text-zinc-400">{t.reservationSummaryPrice}: {formatCurrency(booking.program_price, language, currencyCode)}</p>
+              <p className="text-sm text-zinc-400">{t.depositLabel}: {formatCurrency(booking.deposit_amount, language, currencyCode)} · {t.balanceLabel}: {formatCurrency(booking.balance_amount, language, currencyCode)}</p>
             </div>
             <div data-testid="booking-overall-payment">
               <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{t.overallPaymentLabel}</p>
@@ -1347,6 +1355,8 @@ const DashboardView = ({ dashboard, language, currencyCode }) => {
         <MetricCard subtitle={t.bookings} testId="metric-dogs-delivered" title={t.dogsDelivered} value={dashboard.metrics.dogs_delivered} />
         <MetricCard subtitle={t.finance} testId="metric-deposits-pending" title={t.depositsPending} value={dashboard.metrics.deposits_pending} />
         <MetricCard subtitle={t.finance} testId="metric-paid-in-full" title={t.paidInFull} value={dashboard.metrics.paid_in_full} />
+        <MetricCard subtitle={t.finance} testId="metric-deposit-collected" title={t.depositCollected} value={formatCurrency(dashboard.metrics.total_deposit_collected, language, currencyCode)} />
+        <MetricCard subtitle={t.finance} testId="metric-balance-pending" title={t.balancePendingMetric} value={formatCurrency(dashboard.metrics.total_balance_expected - dashboard.metrics.total_balance_collected, language, currencyCode)} />
         <MetricCard subtitle={t.finance} testId="metric-confirmed-revenue" title={t.confirmedRevenue} value={formatCurrency(dashboard.metrics.confirmed_revenue, language, currencyCode)} />
         <MetricCard subtitle={t.finance} testId="metric-pending-revenue" title={t.pendingRevenueMetric} value={formatCurrency(dashboard.metrics.pending_revenue, language, currencyCode)} />
       </div>
@@ -1540,12 +1550,18 @@ const ProgramsView = ({ programs, language, onSaveProgram, currencyCode }) => {
     duration_value: 1,
     duration_unit: "days",
     price: 0,
+    deposit_type: "percentage",
+    deposit_value: 50,
     active: true,
   });
 
   useEffect(() => {
     if (editingProgram) {
-      setFormState(editingProgram);
+      setFormState({
+        ...editingProgram,
+        deposit_type: editingProgram.deposit_type || "percentage",
+        deposit_value: editingProgram.deposit_value ?? 50,
+      });
     } else {
       setFormState({
         name_es: "",
@@ -1555,6 +1571,8 @@ const ProgramsView = ({ programs, language, onSaveProgram, currencyCode }) => {
         duration_value: 1,
         duration_unit: "days",
         price: 0,
+        deposit_type: "percentage",
+        deposit_value: 50,
         active: true,
       });
     }
@@ -1579,6 +1597,16 @@ const ProgramsView = ({ programs, language, onSaveProgram, currencyCode }) => {
             <CardContent className="text-sm text-zinc-300">
               <p>{program.description_es}</p>
               <p className="mt-3 text-zinc-500">{program.duration_value} {program.duration_unit === "weeks" ? t.weeks : t.days} · {formatCurrency(program.price, language, currencyCode)}</p>
+              <p className="mt-1 text-zinc-500">
+                {t.depositLabel}: {program.deposit_type === "fixed" ? formatCurrency(program.deposit_value || 0, language, currencyCode) : `${program.deposit_value || 50}%`}
+                {" · "}
+                {(() => {
+                  const dep = program.deposit_type === "fixed"
+                    ? Math.min(program.deposit_value || 0, program.price)
+                    : Math.round(program.price * (program.deposit_value || 50) / 100 * 100) / 100;
+                  return `${formatCurrency(dep, language, currencyCode)} + ${formatCurrency(program.price - dep, language, currencyCode)}`;
+                })()}
+              </p>
             </CardContent>
           </Card>
         ))}
@@ -1602,6 +1630,11 @@ const ProgramsView = ({ programs, language, onSaveProgram, currencyCode }) => {
             <option value="true">{t.active}</option>
             <option value="false">{t.inactive}</option>
           </select>
+          <select className="h-11 rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="program-deposit-type-select" onChange={(event) => update("deposit_type", event.target.value)} value={formState.deposit_type}>
+            <option value="percentage">{t.depositPercentage}</option>
+            <option value="fixed">{t.depositFixed}</option>
+          </select>
+          <Input data-testid="program-deposit-value-input" min="0" onChange={(event) => update("deposit_value", Number(event.target.value))} placeholder={formState.deposit_type === "percentage" ? "%" : t.depositLabel} type="number" value={formState.deposit_value} />
           <div className="md:col-span-2 flex justify-end gap-3">
             {editingProgram && <Button className="touch-button" data-testid="cancel-program-edit-button" onClick={() => setEditingProgram(null)} type="button" variant="outline">{t.close}</Button>}
             <Button className="touch-button bg-primary text-white hover:bg-red-700" data-testid="save-program-button" onClick={() => onSaveProgram(editingProgram?.id, formState).then(() => setEditingProgram(null))} type="button">

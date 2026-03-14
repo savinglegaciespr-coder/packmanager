@@ -1,0 +1,62 @@
+{
+  "summary": "Configurable deposit settings feature fully tested and verified. All 13 backend API tests passed (100%). Frontend UI tests confirmed that dashboard shows deposit metrics, programs page shows deposit config (type, value, deposit/balance amounts), booking detail dialog shows deposit/balance, and public booking form shows deposit proof upload.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_deposit_configuration.py",
+    "/app/test_reports/pytest/pytest_deposit_config.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_deposit_configuration.py"
+  ],
+  "success_rate": {
+    "backend": "100% (13/13 tests passed)",
+    "frontend": "100% (all UI elements present and working)"
+  },
+  "test_credentials": {
+    "admin_email": "admin@pawstraining.com",
+    "admin_password": "PawsAdmin2026!"
+  },
+  "seed_data_creation": "Created test bookings with TEST_Deposit_Config_, TEST_Pct_, TEST_Fixed_, TEST_Cap_ prefixes during backend tests for deposit computation verification",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Configurable deposit settings are fully functional. Programs have deposit_type (percentage/fixed) and deposit_value fields. Bookings compute deposit_amount and balance_amount from the program_snapshot's deposit config. Dashboard shows total_deposit_expected, total_deposit_collected, total_balance_expected, total_balance_collected metrics. Test file at /app/backend/tests/test_deposit_configuration.py covers all scenarios.",
+  "verified_features": {
+    "backend_endpoints": {
+      "GET /api/public/programs": "Returns programs with deposit_type and deposit_value fields",
+      "GET /api/admin/programs": "Returns programs with deposit_type and deposit_value fields",
+      "PUT /api/admin/programs/{id}": "Accepts and updates deposit_type and deposit_value",
+      "GET /api/admin/bookings": "Returns bookings with computed deposit_amount and balance_amount",
+      "GET /api/admin/bookings/{id}": "Returns booking detail with deposit_amount, balance_amount, program_snapshot containing deposit config",
+      "POST /api/admin/bookings/manual": "Creates booking with program_snapshot containing deposit config",
+      "GET /api/admin/dashboard": "Returns metrics with total_deposit_expected, total_deposit_collected, total_balance_expected, total_balance_collected"
+    },
+    "deposit_computation_formulas": {
+      "percentage_mode": "deposit = price * deposit_value / 100",
+      "fixed_mode": "deposit = min(deposit_value, price)",
+      "balance": "balance = price - deposit",
+      "backward_compatibility": "Old bookings without deposit config in snapshot default to deposit_type=percentage, deposit_value=100 (full price as deposit)"
+    },
+    "frontend_elements": {
+      "dashboard": "Shows 'Depósitos cobrados' (Deposits collected) and 'Saldo por cobrar' (Balance outstanding) metric cards",
+      "programs_page": "Shows deposit info on cards: 'Depósito: 50% · $225 + $225' format",
+      "program_form": "Has deposit_type dropdown (Porcentaje/Percentage, Monto fijo/Fixed amount) and deposit_value input",
+      "booking_detail_dialog": "Shows 'Precio del programa: $X · Depósito: $Y · Saldo: $Z'",
+      "reservations_table": "Shows payment status column with 'Depósito pendiente', 'Depósito verificado', 'Saldo pendiente', 'Pagado completo' badges",
+      "public_booking_form": "Shows 'Comprobante de depósito' / 'Deposit proof' for file upload"
+    },
+    "dashboard_metrics_verified": {
+      "total_deposit_collected": "$2330",
+      "balance_outstanding": "$1139"
+    }
+  }
+}

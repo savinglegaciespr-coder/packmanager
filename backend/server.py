@@ -86,6 +86,8 @@ class ProgramPayload(BaseModel):
     duration_value: int = Field(ge=1)
     duration_unit: Literal["days", "weeks"]
     price: float = Field(ge=0)
+    deposit_type: Literal["percentage", "fixed"] = "percentage"
+    deposit_value: float = Field(ge=0, default=50.0)
     active: bool = True
 
 
@@ -258,6 +260,14 @@ def build_medical_flags(booking: Dict[str, Any]) -> List[Dict[str, str]]:
     return flags
 
 
+def compute_deposit_amounts(program_price: float, deposit_type: str, deposit_value: float) -> Dict[str, float]:
+    if deposit_type == "fixed":
+        deposit = min(deposit_value, program_price)
+    else:
+        deposit = round(program_price * min(deposit_value, 100.0) / 100.0, 2)
+    return {"deposit_amount": round(deposit, 2), "balance_amount": round(program_price - deposit, 2)}
+
+
 def compute_overall_payment_status(booking_doc: Dict[str, Any]) -> str:
     deposit = booking_doc.get("payment_status", "Pending Review")
     final = booking_doc.get("final_payment_status", "Pending Review")
@@ -276,6 +286,13 @@ def sanitize_booking(booking_doc: Dict[str, Any]) -> Dict[str, Any]:
     booking.setdefault("final_payment_proof", None)
     booking.setdefault("final_payment_status", "Pending Review")
     booking["overall_payment_status"] = compute_overall_payment_status(booking)
+    snapshot = booking.get("program_snapshot") or {}
+    price = float(booking.get("program_price", 0))
+    dep_type = snapshot.get("deposit_type", "percentage")
+    dep_val = snapshot.get("deposit_value", 100.0)
+    amounts = compute_deposit_amounts(price, dep_type, dep_val)
+    booking["deposit_amount"] = amounts["deposit_amount"]
+    booking["balance_amount"] = amounts["balance_amount"]
     return booking
 
 
@@ -379,6 +396,8 @@ def default_programs() -> List[Dict[str, Any]]:
             "duration_value": 6,
             "duration_unit": "days",
             "price": 420.0,
+            "deposit_type": "percentage",
+            "deposit_value": 50.0,
             "active": True,
             "created_at": now,
             "updated_at": now,
@@ -392,6 +411,8 @@ def default_programs() -> List[Dict[str, Any]]:
             "duration_value": 3,
             "duration_unit": "weeks",
             "price": 1200.0,
+            "deposit_type": "percentage",
+            "deposit_value": 50.0,
             "active": True,
             "created_at": now,
             "updated_at": now,
@@ -828,6 +849,12 @@ async def ensure_seed_data() -> None:
         {"$set": {"final_payment_proof": None, "final_payment_status": "Pending Review"}},
     )
 
+    # Backfill deposit config for programs that lack it
+    await db.programs.update_many(
+        {"deposit_type": {"$exists": False}},
+        {"$set": {"deposit_type": "percentage", "deposit_value": 50.0}},
+    )
+
 
 async def expire_stale_bookings() -> int:
     now = iso_now()
@@ -1086,6 +1113,10 @@ async def build_dashboard_payload() -> Dict[str, Any]:
     deposits_verified = 0
     balance_pending = 0
     paid_in_full = 0
+    total_deposit_expected = 0.0
+    total_deposit_collected = 0.0
+    total_balance_expected = 0.0
+    total_balance_collected = 0.0
     pending_intake = 0
     in_training = 0
     delivered = 0
@@ -1116,6 +1147,17 @@ async def build_dashboard_payload() -> Dict[str, Any]:
             balance_pending += 1
         elif overall_ps == "Paid in Full":
             paid_in_full += 1
+        # Deposit/balance financial tracking
+        if booking["status"] not in {"Rejected", "Cancelled", "Expired"}:
+            snapshot = booking.get("program_snapshot") or {}
+            price = float(booking.get("program_price", 0))
+            amounts = compute_deposit_amounts(price, snapshot.get("deposit_type", "percentage"), snapshot.get("deposit_value", 100.0))
+            total_deposit_expected += amounts["deposit_amount"]
+            total_balance_expected += amounts["balance_amount"]
+            if booking.get("payment_status") == "Verified":
+                total_deposit_collected += amounts["deposit_amount"]
+            if booking.get("final_payment_status") == "Verified":
+                total_balance_collected += amounts["balance_amount"]
         if booking["status"] in {"Approved", "Scheduled"}:
             pending_intake += 1
         if booking["status"] == "In Training":
@@ -1149,6 +1191,10 @@ async def build_dashboard_payload() -> Dict[str, Any]:
             "deposits_verified": deposits_verified,
             "balance_pending": balance_pending,
             "paid_in_full": paid_in_full,
+            "total_deposit_expected": round(total_deposit_expected, 2),
+            "total_deposit_collected": round(total_deposit_collected, 2),
+            "total_balance_expected": round(total_balance_expected, 2),
+            "total_balance_collected": round(total_balance_collected, 2),
             "confirmed_revenue": round(confirmed_revenue_total, 2),
             "pending_revenue": round(pending_revenue_total, 2),
         },
