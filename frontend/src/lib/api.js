@@ -5,6 +5,7 @@ const API_URL = `${BACKEND_URL}/api`;
 
 const client = axios.create({
   baseURL: API_URL,
+  timeout: 15000,
 });
 
 const authConfig = (token) => ({

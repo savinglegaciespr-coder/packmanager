@@ -2526,15 +2526,27 @@ function App() {
     return stored ? JSON.parse(stored) : null;
   });
   const [publicState, setPublicState] = useState({ config: null, programs: [] });
+  const [initError, setInitError] = useState(false);
+  const retryCountRef = useRef(0);
 
   const refreshPublicData = useCallback(async () => {
     try {
       const [config, programs] = await Promise.all([publicApi.getConfig(), publicApi.getPrograms()]);
       setPublicState({ config, programs });
+      setInitError(false);
+      retryCountRef.current = 0;
     } catch (error) {
       toast.error(error.message);
+      if (!publicState.config) {
+        if (retryCountRef.current < 3) {
+          retryCountRef.current += 1;
+          setTimeout(() => refreshPublicData(), 2000 * retryCountRef.current);
+        } else {
+          setInitError(true);
+        }
+      }
     }
-  }, []);
+  }, [publicState.config]);
 
   useEffect(() => {
     document.documentElement.classList.add("dark");
@@ -2559,7 +2571,22 @@ function App() {
   }, [session]);
 
   if (!publicState.config) {
-    return <div className="app-shell flex min-h-screen items-center justify-center text-zinc-400">Loading PAWS TRAINING...</div>;
+    return (
+      <div className="app-shell flex min-h-screen flex-col items-center justify-center gap-4 text-zinc-400" data-testid="app-loading-screen">
+        {initError ? (
+          <>
+            <AlertTriangle className="h-10 w-10 text-red-500" />
+            <p className="text-lg">{language === "es" ? "No se pudo conectar con el servidor." : "Could not connect to the server."}</p>
+            <Button className="mt-2 rounded-full bg-primary text-white hover:bg-red-700" data-testid="retry-loading-button" onClick={() => { setInitError(false); retryCountRef.current = 0; refreshPublicData(); }}>
+              {language === "es" ? "Reintentar" : "Retry"}
+            </Button>
+          </>
+        ) : (
+          <p>Loading PAWS TRAINING...</p>
+        )}
+        <Toaster richColors theme="dark" />
+      </div>
+    );
   }
 
   return (
