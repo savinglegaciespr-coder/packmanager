@@ -199,6 +199,22 @@ export const adminApi = {
       return normalizeError(error);
     }
   },
+  async uploadFinalPaymentProof(token, bookingId, file) {
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const response = await client.post(`/admin/bookings/${bookingId}/final-payment-proof`, formData, {
+        ...authConfig(token),
+        headers: {
+          ...authConfig(token).headers,
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      return response.data;
+    } catch (error) {
+      return normalizeError(error);
+    }
+  },
 };
 
 export const getProtectedDocumentUrl = (bookingId, documentType) => `${API_URL}/admin/documents/${bookingId}/${documentType}`;

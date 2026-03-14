@@ -271,11 +271,14 @@ const parseDogDateInput = (value) => {
 };
 
 const getStatusStyles = (status) => {
-  if (["Approved", "Verified", "Eligible", "Delivered"].includes(status)) {
+  if (["Approved", "Verified", "Eligible", "Delivered", "Paid in Full"].includes(status)) {
     return "border-green-500/25 bg-green-500/10 text-green-200";
   }
-  if (["Pending Review", "almost_full", "In Training", "Scheduled"].includes(status)) {
+  if (["Pending Review", "almost_full", "In Training", "Scheduled", "Deposit Pending", "Balance Pending"].includes(status)) {
     return "border-yellow-500/25 bg-yellow-500/10 text-yellow-200";
+  }
+  if (["Deposit Verified"].includes(status)) {
+    return "border-blue-500/25 bg-blue-500/10 text-blue-200";
   }
   if (["Rejected", "Invalid", "Cancelled", "Expired", "Ineligible", "full"].includes(status)) {
     return "border-red-500/25 bg-red-500/10 text-red-200";
@@ -981,15 +984,17 @@ const MetricCard = ({ title, value, subtitle, testId }) => (
   </Card>
 );
 
-const BookingDetailDialog = ({ booking, language, onClose, onSave, token, currencyCode }) => {
+const BookingDetailDialog = ({ booking, language, onClose, onSave, token, currencyCode, onFinalPaymentUpload }) => {
   const t = translations[language];
   const [formState, setFormState] = useState(null);
+  const [uploadingFinal, setUploadingFinal] = useState(false);
 
   useEffect(() => {
     if (booking) {
       setFormState({
         status: booking.status,
         payment_status: booking.payment_status,
+        final_payment_status: booking.final_payment_status || "Pending Review",
         vaccination_certificate_status: booking.vaccination_certificate_status,
         eligibility_status: booking.eligibility_status,
         internal_notes: booking.internal_notes || "",
@@ -1001,6 +1006,7 @@ const BookingDetailDialog = ({ booking, language, onClose, onSave, token, curren
   if (!booking || !formState) return null;
 
   const scheduleDates = getBookingScheduleDates(booking);
+  const overallPayment = booking.overall_payment_status || "Deposit Pending";
 
   const saveChanges = async () => {
     await onSave(booking.id, {
@@ -1009,6 +1015,21 @@ const BookingDetailDialog = ({ booking, language, onClose, onSave, token, curren
       delivery_date: scheduleDates.delivery_date || null,
     });
     onClose();
+  };
+
+  const handleFinalPaymentUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setUploadingFinal(true);
+    try {
+      await onFinalPaymentUpload(booking.id, file);
+      toast.success(language === "es" ? "Comprobante final subido." : "Final payment proof uploaded.");
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setUploadingFinal(false);
+      event.target.value = "";
+    }
   };
 
   return (
@@ -1036,18 +1057,37 @@ const BookingDetailDialog = ({ booking, language, onClose, onSave, token, curren
               <p className="mt-2 text-sm text-zinc-200">{language === "es" ? booking.program_name_es : booking.program_name_en}</p>
               <p className="text-sm text-zinc-400">{t.reservationSummaryPrice}: {formatCurrency(booking.program_price, language, currencyCode)}</p>
             </div>
+            <div data-testid="booking-overall-payment">
+              <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{t.overallPaymentLabel}</p>
+              <Badge className={`mt-2 ${getStatusStyles(overallPayment)}`} data-testid="overall-payment-badge">{t.status[overallPayment] || overallPayment}</Badge>
+            </div>
             <div className="flex flex-wrap gap-2" data-testid="medical-flags-panel">
               {booking.medical_flags.map((flag) => (
                 <span className="status-chip bg-black/20 text-zinc-200" key={flag.label}>{flag.label}</span>
               ))}
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Button className="touch-button rounded-full" data-testid="open-payment-proof-button" onClick={() => openProtectedDocument(token, booking.id, "payment_proof")} type="button" variant="outline">
-                <FileText className="mr-2 h-4 w-4" /> {t.paymentProof}
-              </Button>
-              <Button className="touch-button rounded-full" data-testid="open-certificate-button" onClick={() => openProtectedDocument(token, booking.id, "vaccination_certificate")} type="button" variant="outline">
-                <ShieldCheck className="mr-2 h-4 w-4" /> {t.vaccinationCertificate}
-              </Button>
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{t.documents}</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Button className="touch-button rounded-full" data-testid="open-payment-proof-button" onClick={() => openProtectedDocument(token, booking.id, "payment_proof")} type="button" variant="outline">
+                  <FileText className="mr-2 h-4 w-4" /> {t.depositProofField}
+                </Button>
+                <Button className="touch-button rounded-full" data-testid="open-certificate-button" onClick={() => openProtectedDocument(token, booking.id, "vaccination_certificate")} type="button" variant="outline">
+                  <ShieldCheck className="mr-2 h-4 w-4" /> {t.vaccinationCertificate}
+                </Button>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {booking.final_payment_proof ? (
+                  <Button className="touch-button rounded-full" data-testid="open-final-payment-proof-button" onClick={() => openProtectedDocument(token, booking.id, "final_payment_proof")} type="button" variant="outline">
+                    <CreditCard className="mr-2 h-4 w-4" /> {t.finalPaymentProofField}
+                  </Button>
+                ) : (
+                  <label className="touch-button inline-flex cursor-pointer items-center justify-center rounded-full border border-dashed border-white/20 px-4 py-2.5 text-sm text-zinc-400 transition-colors hover:border-white/40 hover:text-white" data-testid="upload-final-payment-button">
+                    <UploadCloud className="mr-2 h-4 w-4" /> {uploadingFinal ? "..." : t.uploadFinalPaymentProof}
+                    <input accept=".pdf,image/*" className="hidden" disabled={uploadingFinal} onChange={handleFinalPaymentUpload} type="file" />
+                  </label>
+                )}
+              </div>
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
@@ -1058,8 +1098,14 @@ const BookingDetailDialog = ({ booking, language, onClose, onSave, token, curren
               </select>
             </div>
             <div>
-              <label className="mb-2 block text-sm text-zinc-300" data-testid="payment-status-label">{t.paymentProofField}</label>
+              <label className="mb-2 block text-sm text-zinc-300" data-testid="payment-status-label">{t.depositProofField}</label>
               <select className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="payment-status-select" onChange={(event) => setFormState((current) => ({ ...current, payment_status: event.target.value }))} value={formState.payment_status}>
+                {DOC_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{t.status[option] || option}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-2 block text-sm text-zinc-300" data-testid="final-payment-status-label">{t.finalPaymentStatusField}</label>
+              <select className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="final-payment-status-select" onChange={(event) => setFormState((current) => ({ ...current, final_payment_status: event.target.value }))} value={formState.final_payment_status}>
                 {DOC_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{t.status[option] || option}</option>)}
               </select>
             </div>
@@ -1127,6 +1173,7 @@ const ManualBookingDialog = ({ open, onClose, programs, onCreate, language, capa
     status: "Scheduled",
     internal_notes: "",
     payment_status: "Verified",
+    final_payment_status: "Pending Review",
     vaccination_certificate_status: "Verified",
     eligibility_status: "Eligible",
   });
@@ -1298,8 +1345,8 @@ const DashboardView = ({ dashboard, language, currencyCode }) => {
         <MetricCard subtitle={t.bookings} testId="metric-dogs-pending-intake" title={t.dogsPendingIntake} value={dashboard.metrics.dogs_pending_intake} />
         <MetricCard subtitle={t.bookings} testId="metric-dogs-in-training" title={t.dogsInTraining} value={dashboard.metrics.dogs_in_training} />
         <MetricCard subtitle={t.bookings} testId="metric-dogs-delivered" title={t.dogsDelivered} value={dashboard.metrics.dogs_delivered} />
-        <MetricCard subtitle={t.finance} testId="metric-pending-payments" title={t.pendingPayments} value={dashboard.metrics.pending_payments} />
-        <MetricCard subtitle={t.finance} testId="metric-confirmed-payments" title={t.confirmedPayments} value={dashboard.metrics.confirmed_payments} />
+        <MetricCard subtitle={t.finance} testId="metric-deposits-pending" title={t.depositsPending} value={dashboard.metrics.deposits_pending} />
+        <MetricCard subtitle={t.finance} testId="metric-paid-in-full" title={t.paidInFull} value={dashboard.metrics.paid_in_full} />
         <MetricCard subtitle={t.finance} testId="metric-confirmed-revenue" title={t.confirmedRevenue} value={formatCurrency(dashboard.metrics.confirmed_revenue, language, currencyCode)} />
         <MetricCard subtitle={t.finance} testId="metric-pending-revenue" title={t.pendingRevenueMetric} value={formatCurrency(dashboard.metrics.pending_revenue, language, currencyCode)} />
       </div>
@@ -1388,7 +1435,7 @@ const DashboardView = ({ dashboard, language, currencyCode }) => {
   );
 };
 
-const BookingsView = ({ bookings, programs, token, language, onUpdateBooking, onManualCreate, currencyCode, capacityWeeks }) => {
+const BookingsView = ({ bookings, programs, token, language, onUpdateBooking, onFinalPaymentUpload, onManualCreate, currencyCode, capacityWeeks }) => {
   const t = translations[language];
   const [filters, setFilters] = useState({ status: "all", programId: "all", weekStart: "all", search: "" });
   const [selectedBooking, setSelectedBooking] = useState(null);
@@ -1453,7 +1500,7 @@ const BookingsView = ({ bookings, programs, token, language, onUpdateBooking, on
                   <th className="px-4">Program</th>
                   <th className="px-4">Week</th>
                   <th className="px-4">Status</th>
-                  <th className="px-4">Docs</th>
+                  <th className="px-4">{t.overallPaymentLabel}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1467,7 +1514,7 @@ const BookingsView = ({ bookings, programs, token, language, onUpdateBooking, on
                       <Badge className={getStatusStyles(booking.status)}>{t.status[booking.status] || booking.status}</Badge>
                     </td>
                     <td className="rounded-r-2xl px-4 py-4 text-sm text-zinc-300">
-                      {t.status[booking.payment_status] || booking.payment_status} / {t.status[booking.vaccination_certificate_status] || booking.vaccination_certificate_status}
+                      <Badge className={getStatusStyles(booking.overall_payment_status)}>{t.status[booking.overall_payment_status] || booking.overall_payment_status}</Badge>
                     </td>
                   </tr>
                 ))}
@@ -1476,7 +1523,7 @@ const BookingsView = ({ bookings, programs, token, language, onUpdateBooking, on
           </div>
         </CardContent>
       </Card>
-      <BookingDetailDialog booking={selectedBooking} currencyCode={currencyCode} language={language} onClose={() => setSelectedBooking(null)} onSave={onUpdateBooking} token={token} />
+      <BookingDetailDialog booking={selectedBooking} currencyCode={currencyCode} language={language} onClose={() => setSelectedBooking(null)} onFinalPaymentUpload={onFinalPaymentUpload} onSave={onUpdateBooking} token={token} />
       <ManualBookingDialog capacityWeeks={capacityWeeks} language={language} onClose={() => setManualOpen(false)} onCreate={onManualCreate} open={manualOpen} programs={programs} />
     </div>
   );
@@ -1637,7 +1684,7 @@ const WeeklyOperationsView = ({ bookings, capacityWeeks, language }) => {
                       </div>
                       <div className="flex flex-wrap gap-2 text-xs">
                         <Badge className={getStatusStyles(booking.status)}>{t.bookingStatusLabel}: {t.status[booking.status] || booking.status}</Badge>
-                        <Badge className={getStatusStyles(booking.payment_status)}>{t.paymentValidationLabel}: {t.status[booking.payment_status] || booking.payment_status}</Badge>
+                        <Badge className={getStatusStyles(booking.overall_payment_status)}>{t.overallPaymentLabel}: {t.status[booking.overall_payment_status] || booking.overall_payment_status}</Badge>
                         <Badge className={getStatusStyles(booking.vaccination_certificate_status)}>{t.vaccinationValidationLabel}: {t.status[booking.vaccination_certificate_status] || booking.vaccination_certificate_status}</Badge>
                       </div>
                     </div>
@@ -1754,7 +1801,7 @@ const OperationsScreenView = ({ bookings, capacityWeeks, dashboard, language, la
                         </div>
                         <div className="flex flex-wrap gap-2 text-sm">
                           <Badge className={`${getStatusStyles(booking.status)} px-4 py-2`}>{t.bookingStatusLabel}: {t.status[booking.status] || booking.status}</Badge>
-                          <Badge className={`${getStatusStyles(booking.payment_status)} px-4 py-2`}>{t.paymentValidationLabel}: {t.status[booking.payment_status] || booking.payment_status}</Badge>
+                          <Badge className={`${getStatusStyles(booking.overall_payment_status)} px-4 py-2`}>{t.overallPaymentLabel}: {t.status[booking.overall_payment_status] || booking.overall_payment_status}</Badge>
                           <Badge className={`${getStatusStyles(booking.vaccination_certificate_status)} px-4 py-2`}>{t.vaccinationValidationLabel}: {t.status[booking.vaccination_certificate_status] || booking.vaccination_certificate_status}</Badge>
                         </div>
                       </div>
@@ -1990,6 +2037,11 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
     }
   };
 
+  const uploadFinalPaymentProof = async (bookingId, file) => {
+    await adminApi.uploadFinalPaymentProof(session.token, bookingId, file);
+    await refreshAll();
+  };
+
   const saveProgram = async (programId, payload) => {
     try {
       if (programId) {
@@ -2136,6 +2188,7 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
                   language={language}
                   onManualCreate={createManualBooking}
                   onUpdateBooking={saveBooking}
+                  onFinalPaymentUpload={uploadFinalPaymentProof}
                   programs={programs}
                   token={session.token}
                 />

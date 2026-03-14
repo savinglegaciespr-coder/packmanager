@@ -121,6 +121,7 @@ class SettingsUpdate(BaseModel):
 class BookingUpdateRequest(BaseModel):
     status: Optional[str] = None
     payment_status: Optional[str] = None
+    final_payment_status: Optional[str] = None
     vaccination_certificate_status: Optional[str] = None
     eligibility_status: Optional[str] = None
     intake_date: Optional[str] = None
@@ -153,6 +154,7 @@ class ManualBookingCreate(BaseModel):
     delivery_date: Optional[str] = None
     internal_notes: Optional[str] = None
     payment_status: str = "Verified"
+    final_payment_status: str = "Pending Review"
     vaccination_certificate_status: str = "Verified"
     eligibility_status: str = "Eligible"
 
@@ -256,9 +258,24 @@ def build_medical_flags(booking: Dict[str, Any]) -> List[Dict[str, str]]:
     return flags
 
 
+def compute_overall_payment_status(booking_doc: Dict[str, Any]) -> str:
+    deposit = booking_doc.get("payment_status", "Pending Review")
+    final = booking_doc.get("final_payment_status", "Pending Review")
+    if deposit != "Verified":
+        return "Deposit Pending"
+    if final == "Verified":
+        return "Paid in Full"
+    if booking_doc.get("final_payment_proof"):
+        return "Balance Pending"
+    return "Deposit Verified"
+
+
 def sanitize_booking(booking_doc: Dict[str, Any]) -> Dict[str, Any]:
     booking = {key: value for key, value in booking_doc.items() if key != "_id"}
     booking["medical_flags"] = build_medical_flags(booking)
+    booking.setdefault("final_payment_proof", None)
+    booking.setdefault("final_payment_status", "Pending Review")
+    booking["overall_payment_status"] = compute_overall_payment_status(booking)
     return booking
 
 
@@ -447,6 +464,8 @@ def build_seed_booking(
         "payment_proof": None,
         "vaccination_certificate": None,
         "payment_status": payment_status,
+        "final_payment_proof": None,
+        "final_payment_status": payment_status,
         "vaccination_certificate_status": vaccination_status_doc,
         "eligibility_status": eligibility_status,
         "rejection_reason": "",
@@ -803,6 +822,12 @@ async def ensure_seed_data() -> None:
         {"$set": {"delivery_status": "logged", "delivery_error": ""}},
     )
 
+    # Backfill two-stage payment fields for bookings that lack them
+    await db.bookings.update_many(
+        {"final_payment_status": {"$exists": False}},
+        {"$set": {"final_payment_proof": None, "final_payment_status": "Pending Review"}},
+    )
+
 
 async def expire_stale_bookings() -> int:
     now = iso_now()
@@ -1057,6 +1082,10 @@ async def build_dashboard_payload() -> Dict[str, Any]:
     revenue_summary: Dict[str, Dict[str, float]] = {}
     pending_payments = 0
     confirmed_payments = 0
+    deposits_pending = 0
+    deposits_verified = 0
+    balance_pending = 0
+    paid_in_full = 0
     pending_intake = 0
     in_training = 0
     delivered = 0
@@ -1078,6 +1107,15 @@ async def build_dashboard_payload() -> Dict[str, Any]:
             pending_payments += 1
         if booking["payment_status"] == "Verified":
             confirmed_payments += 1
+        overall_ps = booking.get("overall_payment_status", "Deposit Pending")
+        if overall_ps == "Deposit Pending":
+            deposits_pending += 1
+        elif overall_ps == "Deposit Verified":
+            deposits_verified += 1
+        elif overall_ps == "Balance Pending":
+            balance_pending += 1
+        elif overall_ps == "Paid in Full":
+            paid_in_full += 1
         if booking["status"] in {"Approved", "Scheduled"}:
             pending_intake += 1
         if booking["status"] == "In Training":
@@ -1107,6 +1145,10 @@ async def build_dashboard_payload() -> Dict[str, Any]:
             "dogs_delivered": delivered,
             "pending_payments": pending_payments,
             "confirmed_payments": confirmed_payments,
+            "deposits_pending": deposits_pending,
+            "deposits_verified": deposits_verified,
+            "balance_pending": balance_pending,
+            "paid_in_full": paid_in_full,
             "confirmed_revenue": round(confirmed_revenue_total, 2),
             "pending_revenue": round(pending_revenue_total, 2),
         },
@@ -1284,6 +1326,8 @@ async def create_public_booking(
         "payment_proof": payment_file,
         "vaccination_certificate": certificate_file,
         "payment_status": "Pending Review",
+        "final_payment_proof": None,
+        "final_payment_status": "Pending Review",
         "vaccination_certificate_status": "Pending Review",
         "eligibility_status": "Pending Review",
         "rejection_reason": "",
@@ -1360,6 +1404,8 @@ async def update_booking(booking_id: str, payload: BookingUpdateRequest, _: Dict
         raise HTTPException(status_code=400, detail="Invalid booking status.")
     if updates.get("payment_status") and updates["payment_status"] not in DOC_STATUS_VALUES:
         raise HTTPException(status_code=400, detail="Invalid payment proof status.")
+    if updates.get("final_payment_status") and updates["final_payment_status"] not in DOC_STATUS_VALUES:
+        raise HTTPException(status_code=400, detail="Invalid final payment status.")
     if updates.get("vaccination_certificate_status") and updates["vaccination_certificate_status"] not in DOC_STATUS_VALUES:
         raise HTTPException(status_code=400, detail="Invalid vaccination certificate status.")
     if updates.get("eligibility_status") and updates["eligibility_status"] not in ELIGIBILITY_VALUES:
@@ -1449,6 +1495,8 @@ async def create_manual_booking(payload: ManualBookingCreate, _: Dict[str, Any] 
         "payment_proof": None,
         "vaccination_certificate": None,
         "payment_status": payload.payment_status,
+        "final_payment_proof": None,
+        "final_payment_status": payload.final_payment_status,
         "vaccination_certificate_status": payload.vaccination_certificate_status,
         "eligibility_status": payload.eligibility_status,
         "rejection_reason": "",
@@ -1566,7 +1614,7 @@ async def get_email_logs(_: Dict[str, Any] = Depends(get_current_admin)) -> List
 
 @api_router.get("/admin/documents/{booking_id}/{document_type}")
 async def get_document(booking_id: str, document_type: str, _: Dict[str, Any] = Depends(get_current_admin)) -> FileResponse:
-    if document_type not in {"payment_proof", "vaccination_certificate"}:
+    if document_type not in {"payment_proof", "vaccination_certificate", "final_payment_proof"}:
         raise HTTPException(status_code=400, detail="Invalid document type.")
     booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
     if not booking:
@@ -1575,6 +1623,22 @@ async def get_document(booking_id: str, document_type: str, _: Dict[str, Any] = 
     if not document or not document.get("path") or not Path(document["path"]).exists():
         raise HTTPException(status_code=404, detail="Document not available.")
     return FileResponse(Path(document["path"]), filename=document.get("original_name"))
+
+
+@api_router.post("/admin/bookings/{booking_id}/final-payment-proof")
+async def upload_final_payment_proof(booking_id: str, file: UploadFile = File(...), _: Dict[str, Any] = Depends(get_current_admin)) -> Dict[str, Any]:
+    booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found.")
+    booking_dir = UPLOAD_DIR / booking_id
+    booking_dir.mkdir(parents=True, exist_ok=True)
+    file_info = await save_upload(file, booking_dir, "final-payment-proof")
+    await db.bookings.update_one(
+        {"id": booking_id},
+        {"$set": {"final_payment_proof": file_info, "updated_at": iso_now()}},
+    )
+    updated = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
+    return sanitize_booking(updated)
 
 
 app.include_router(api_router)

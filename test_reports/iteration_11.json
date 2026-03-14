@@ -1,0 +1,59 @@
+{
+  "summary": "Two-stage payment system fully tested and verified. All 12 backend API tests passed (100%). Frontend UI tests passed showing all new payment fields and labels are correctly displayed. The system correctly tracks: Deposit Pending → Deposit Verified → Balance Pending → Paid in Full.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_two_stage_payment.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_two_stage_payment.py"
+  ],
+  "success_rate": {
+    "backend": "100% (12/12 tests passed)",
+    "frontend": "100% (all UI elements present and working)"
+  },
+  "test_credentials": {
+    "admin_email": "admin@pawstraining.com",
+    "admin_password": "PawsAdmin2026!"
+  },
+  "seed_data_creation": "Created test booking with TEST_TwoStage_ prefix via manual booking API during tests",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Two-stage payment system is fully functional. Backend endpoints tested: GET /api/admin/bookings (returns final_payment_status, final_payment_proof, overall_payment_status), PATCH /api/admin/bookings/{id} (accepts final_payment_status), POST /api/admin/bookings/{id}/final-payment-proof (file upload), GET /api/admin/documents/{id}/final_payment_proof (retrieval), GET /api/admin/dashboard (returns deposits_pending, deposits_verified, balance_pending, paid_in_full metrics). Frontend verified: Reservations table shows overall_payment_status badge column, BookingDetailDialog shows overall payment badge, deposit proof button, final payment proof upload button, separate deposit/final payment status selects, and public booking form shows 'Comprobante de depósito' / 'Deposit proof' labels.",
+  "verified_features": {
+    "backend_endpoints": {
+      "GET /api/admin/bookings": "Returns bookings with final_payment_status, final_payment_proof, overall_payment_status fields",
+      "PATCH /api/admin/bookings/{id}": "Accepts and updates final_payment_status field",
+      "POST /api/admin/bookings/{id}/final-payment-proof": "Uploads file and associates with booking",
+      "GET /api/admin/documents/{id}/final_payment_proof": "Returns uploaded final payment proof file",
+      "GET /api/admin/dashboard": "Returns deposits_pending, deposits_verified, balance_pending, paid_in_full metrics"
+    },
+    "overall_payment_status_computation": {
+      "Deposit Pending": "When payment_status != Verified",
+      "Deposit Verified": "When payment_status == Verified AND no final_payment_proof",
+      "Balance Pending": "When payment_status == Verified AND final_payment_proof uploaded AND final_payment_status != Verified",
+      "Paid in Full": "When both payment_status AND final_payment_status == Verified"
+    },
+    "frontend_elements": {
+      "reservations_table": "Shows overall_payment_status badge column with all 4 states visible",
+      "booking_detail_dialog": "Shows overall payment badge, deposit proof button, final payment upload button, separate status selects",
+      "public_booking_form": "Labels correctly show 'Comprobante de depósito' (ES) / 'Deposit proof' (EN)"
+    },
+    "dashboard_metrics": {
+      "deposits_pending": 8,
+      "deposits_verified": "Multiple bookings showing this state",
+      "balance_pending": "Visible in UI",
+      "paid_in_full": 1
+    }
+  }
+}
