@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import math
 import os
@@ -759,6 +760,8 @@ async def ensure_seed_data() -> None:
                 "booking_id": "seed-2",
                 "locale": "es",
                 "mode": "internal_log",
+                "delivery_status": "logged",
+                "delivery_error": "",
                 "created_at": "2026-03-24T09:15:00+00:00",
             },
             {
@@ -770,6 +773,8 @@ async def ensure_seed_data() -> None:
                 "booking_id": "seed-1",
                 "locale": "es",
                 "mode": "internal_log",
+                "delivery_status": "logged",
+                "delivery_error": "",
                 "created_at": "2026-03-23T14:30:00+00:00",
             },
             {
@@ -781,10 +786,22 @@ async def ensure_seed_data() -> None:
                 "booking_id": "seed-8",
                 "locale": "es",
                 "mode": "internal_log",
+                "delivery_status": "logged",
+                "delivery_error": "",
                 "created_at": "2026-03-25T11:00:00+00:00",
             },
         ]
         await db.email_logs.insert_many([log.copy() for log in sample_logs])
+
+    # Backfill delivery_status for old logs that lack it
+    await db.email_logs.update_many(
+        {"delivery_status": {"$exists": False}},
+        {"$set": {"delivery_status": "logged", "delivery_error": ""}},
+    )
+    await db.email_logs.update_many(
+        {"delivery_status": None},
+        {"$set": {"delivery_status": "logged", "delivery_error": ""}},
+    )
 
 
 async def expire_stale_bookings() -> int:
@@ -909,23 +926,35 @@ async def save_upload(upload: UploadFile, directory: Path, prefix: str) -> Dict[
     }
 
 
-def send_email_via_smtp(settings_doc: Dict[str, Any], recipient: str, subject: str, body: str) -> None:
-    smtp_password_encrypted = settings_doc.get("smtp_password_encrypted")
-    if not smtp_password_encrypted:
-        raise HTTPException(status_code=500, detail="SMTP password is not configured.")
-
-    password = decrypt_secret(smtp_password_encrypted)
+def _smtp_send(smtp_host: str, smtp_port: int, smtp_tls: bool, smtp_username: str, smtp_password: str, recipient: str, subject: str, body: str) -> None:
+    """Blocking SMTP send – runs inside a thread via asyncio.to_thread."""
     message = EmailMessage()
     message["Subject"] = subject
-    message["From"] = settings_doc["smtp_username"]
+    message["From"] = smtp_username
     message["To"] = recipient
     message.set_content(body)
 
-    with smtplib.SMTP(settings_doc["smtp_host"], int(settings_doc["smtp_port"]), timeout=20) as server:
-        if settings_doc.get("smtp_tls", True):
+    with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as server:
+        if smtp_tls:
             server.starttls()
-        server.login(settings_doc["smtp_username"], password)
+        server.login(smtp_username, smtp_password)
         server.send_message(message)
+
+
+async def send_email_via_smtp(settings_doc: Dict[str, Any], recipient: str, subject: str, body: str) -> None:
+    smtp_password_encrypted = settings_doc.get("smtp_password_encrypted")
+    if not smtp_password_encrypted:
+        raise RuntimeError("SMTP password is not configured.")
+
+    password = decrypt_secret(smtp_password_encrypted)
+    host = settings_doc.get("smtp_host", "smtp.gmail.com")
+    port = int(settings_doc.get("smtp_port", 587))
+    tls = settings_doc.get("smtp_tls", True)
+    username = settings_doc["smtp_username"]
+
+    logger.info("SMTP send → to=%s subject='%s' host=%s port=%d", recipient, subject, host, port)
+    await asyncio.to_thread(_smtp_send, host, port, tls, username, password, recipient, subject, body)
+    logger.info("SMTP send OK → to=%s", recipient)
 
 
 async def queue_email(recipient: str, subject: str, body: str, *, audience: str, booking_id: str, locale: str) -> None:
@@ -936,12 +965,14 @@ async def queue_email(recipient: str, subject: str, body: str, *, audience: str,
 
     if delivery_mode == "smtp":
         try:
-            send_email_via_smtp(settings_doc, recipient, subject, body)
+            await send_email_via_smtp(settings_doc, recipient, subject, body)
             delivery_status = "sent"
         except Exception as exc:  # noqa: BLE001
-            logger.exception("SMTP delivery failed for %s", recipient)
+            logger.exception("SMTP delivery failed for %s: %s", recipient, exc)
             delivery_status = "failed"
             delivery_error = str(exc)
+    else:
+        logger.info("Email logged (mode=%s) → to=%s subject='%s'", delivery_mode, recipient, subject)
 
     email_log = {
         "id": str(uuid.uuid4()),
