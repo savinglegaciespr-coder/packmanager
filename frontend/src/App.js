@@ -163,6 +163,36 @@ const formatDisplayDate = (isoDate, language) => {
   }).format(dateValue);
 };
 
+const getProgramDurationDays = (durationValue, durationUnit) => {
+  const normalizedValue = Number(durationValue || 0);
+  if (!normalizedValue) return 0;
+  return durationUnit === "weeks" ? normalizedValue * 7 : normalizedValue;
+};
+
+const getScheduleDatesFromProgram = (startDateValue, durationValue, durationUnit) => {
+  if (!startDateValue) {
+    return { intake_date: "", delivery_date: "" };
+  }
+
+  const intakeDate = startDateValue;
+  const startDate = new Date(`${intakeDate}T00:00:00`);
+  if (Number.isNaN(startDate.getTime())) {
+    return { intake_date: intakeDate, delivery_date: "" };
+  }
+
+  const totalDays = getProgramDurationDays(durationValue, durationUnit);
+  if (!totalDays) {
+    return { intake_date: intakeDate, delivery_date: "" };
+  }
+
+  const deliveryDate = new Date(startDate);
+  deliveryDate.setDate(deliveryDate.getDate() + Math.max(totalDays - 1, 0));
+  return {
+    intake_date: intakeDate,
+    delivery_date: deliveryDate.toISOString().split("T")[0],
+  };
+};
+
 const formatMonthLabel = (dateValue, language) =>
   new Intl.DateTimeFormat(language === "es" ? "es-ES" : "en-US", {
     month: "long",
@@ -212,25 +242,7 @@ const getBookingScheduleDates = (booking) => {
   if (!booking?.start_week) {
     return { intake_date: "", delivery_date: "" };
   }
-
-  const intakeDate = booking.start_week;
-  const startDate = new Date(`${intakeDate}T00:00:00`);
-  if (Number.isNaN(startDate.getTime())) {
-    return { intake_date: intakeDate, delivery_date: "" };
-  }
-
-  const durationValue = Number(booking.duration_value || 0);
-  const totalDays = booking.duration_unit === "weeks" ? durationValue * 7 : durationValue;
-  if (!totalDays) {
-    return { intake_date: intakeDate, delivery_date: "" };
-  }
-
-  const deliveryDate = new Date(startDate);
-  deliveryDate.setDate(deliveryDate.getDate() + Math.max(totalDays - 1, 0));
-  return {
-    intake_date: intakeDate,
-    delivery_date: deliveryDate.toISOString().split("T")[0],
-  };
+  return getScheduleDatesFromProgram(booking.start_week, booking.duration_value, booking.duration_unit);
 };
 
 const parseDogDateInput = (value) => {
@@ -1091,7 +1103,6 @@ const ManualBookingDialog = ({ open, onClose, programs, onCreate, language }) =>
     owner_address: "",
     dog_name: "",
     breed: "",
-    age: "",
     sex: "Male",
     weight: "",
     date_of_birth: "",
@@ -1101,13 +1112,18 @@ const ManualBookingDialog = ({ open, onClose, programs, onCreate, language }) =>
     current_medication: "",
     additional_notes: "",
     status: "Scheduled",
-    intake_date: "",
-    delivery_date: "",
     internal_notes: "",
     payment_status: "Verified",
     vaccination_certificate_status: "Verified",
     eligibility_status: "Eligible",
   });
+  const selectedProgram = useMemo(() => programs.find((program) => program.id === formState.program_id), [formState.program_id, programs]);
+  const manualDogAge = useMemo(() => calculateDogAge(formState.date_of_birth, language), [formState.date_of_birth, language]);
+  const manualScheduleDates = useMemo(
+    () => getScheduleDatesFromProgram(formState.start_week, selectedProgram?.duration_value, selectedProgram?.duration_unit),
+    [formState.start_week, selectedProgram],
+  );
+  const maxDogBirthDate = useMemo(() => new Date().toISOString().split("T")[0], []);
 
   useEffect(() => {
     if (programs.length && !formState.program_id) {
@@ -1120,8 +1136,9 @@ const ManualBookingDialog = ({ open, onClose, programs, onCreate, language }) =>
   const handleCreate = async () => {
     await onCreate({
       ...formState,
-      intake_date: formState.intake_date || null,
-      delivery_date: formState.delivery_date || null,
+      age: manualDogAge,
+      intake_date: manualScheduleDates.intake_date || null,
+      delivery_date: manualScheduleDates.delivery_date || null,
     });
     onClose();
   };
@@ -1138,19 +1155,31 @@ const ManualBookingDialog = ({ open, onClose, programs, onCreate, language }) =>
           </DialogDescription>
         </DialogHeader>
         <div className="mobile-dialog-grid grid gap-4 md:grid-cols-2">
-          <select className="h-11 rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="manual-program-select" onChange={(event) => update("program_id", event.target.value)} value={formState.program_id}>
-            {programs.map((program) => <option key={program.id} value={program.id}>{language === "es" ? program.name_es : program.name_en}</option>)}
-          </select>
-          <Input data-testid="manual-start-week-input" onChange={(event) => update("start_week", event.target.value)} type="date" value={formState.start_week} />
+          <div>
+            <label className="mb-2 block text-sm text-zinc-300" data-testid="manual-program-label">{t.programName}</label>
+            <select className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="manual-program-select" onChange={(event) => update("program_id", event.target.value)} value={formState.program_id}>
+              {programs.map((program) => <option key={program.id} value={program.id}>{language === "es" ? program.name_es : program.name_en}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-2 block text-sm text-zinc-300" data-testid="manual-start-week-label">{t.selectWeek}</label>
+            <Input data-testid="manual-start-week-input" onChange={(event) => update("start_week", event.target.value)} type="date" value={formState.start_week} />
+          </div>
           <Input data-testid="manual-owner-name-input" onChange={(event) => update("owner_full_name", event.target.value)} placeholder={t.fullName} value={formState.owner_full_name} />
           <Input data-testid="manual-owner-email-input" onChange={(event) => update("owner_email", event.target.value)} placeholder={t.email} type="email" value={formState.owner_email} />
           <Input data-testid="manual-owner-phone-input" onChange={(event) => update("owner_phone", event.target.value)} placeholder={t.phone} value={formState.owner_phone} />
           <Input data-testid="manual-owner-address-input" onChange={(event) => update("owner_address", event.target.value)} placeholder={t.address} value={formState.owner_address} />
           <Input data-testid="manual-dog-name-input" onChange={(event) => update("dog_name", event.target.value)} placeholder={t.dogName} value={formState.dog_name} />
           <Input data-testid="manual-dog-breed-input" onChange={(event) => update("breed", event.target.value)} placeholder={t.breed} value={formState.breed} />
-          <Input data-testid="manual-dog-age-input" onChange={(event) => update("age", event.target.value)} placeholder={t.age} value={formState.age} />
           <Input data-testid="manual-dog-weight-input" onChange={(event) => update("weight", event.target.value)} placeholder={t.weight} value={formState.weight} />
-          <Input data-testid="manual-dob-input" onChange={(event) => update("date_of_birth", event.target.value)} type="date" value={formState.date_of_birth} />
+          <div>
+            <label className="mb-2 block text-sm text-zinc-300" data-testid="manual-dob-label">{t.dob}</label>
+            <Input data-testid="manual-dob-input" max={maxDogBirthDate} onChange={(event) => update("date_of_birth", event.target.value)} type="date" value={formState.date_of_birth} />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm text-zinc-300" data-testid="manual-dog-age-label">{t.automaticAge}</label>
+            <Input data-testid="manual-dog-age-input" readOnly type="text" value={manualDogAge || t.agePending} />
+          </div>
           <div>
             <label className="mb-2 block text-sm text-zinc-300" data-testid="manual-vaccination-status-label">{t.vaccinationStatus}</label>
             <select className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="manual-vaccination-status-input" onChange={(event) => update("vaccination_status", event.target.value)} value={formState.vaccination_status}>
@@ -1158,10 +1187,20 @@ const ManualBookingDialog = ({ open, onClose, programs, onCreate, language }) =>
               <option value={t.no}>{t.no}</option>
             </select>
           </div>
-          <select className="h-11 rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="manual-booking-status-select" onChange={(event) => update("status", event.target.value)} value={formState.status}>
-            {STATUS_OPTIONS.map((option) => <option key={option} value={option}>{t.status[option] || option}</option>)}
-          </select>
-          <Input data-testid="manual-intake-date-input" onChange={(event) => update("intake_date", event.target.value)} type="date" value={formState.intake_date} />
+          <div>
+            <label className="mb-2 block text-sm text-zinc-300" data-testid="manual-booking-status-label">{t.bookingStatusField}</label>
+            <select className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="manual-booking-status-select" onChange={(event) => update("status", event.target.value)} value={formState.status}>
+              {STATUS_OPTIONS.map((option) => <option key={option} value={option}>{t.status[option] || option}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-2 block text-sm text-zinc-300" data-testid="manual-intake-date-label">{t.intakeDateField}</label>
+            <Input data-testid="manual-intake-date-input" readOnly type="text" value={manualScheduleDates.intake_date || formState.start_week} />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm text-zinc-300" data-testid="manual-delivery-date-label">{t.deliveryDateField}</label>
+            <Input data-testid="manual-delivery-date-input" readOnly type="text" value={manualScheduleDates.delivery_date || ""} />
+          </div>
           <div className="md:col-span-2">
             <Textarea data-testid="manual-goals-textarea" onChange={(event) => update("behavior_goals", event.target.value)} placeholder={t.goals} value={formState.behavior_goals} />
           </div>
