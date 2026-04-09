@@ -91,7 +91,8 @@ class CreateUserRequest(BaseModel):
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
-    new_password: str = Field(min_length=8)
+    new_password: Optional[str] = Field(default=None, min_length=8)
+    new_email: Optional[EmailStr] = None
 
 
 class ProgramPayload(BaseModel):
@@ -1435,11 +1436,21 @@ async def me(admin: Dict[str, Any] = Depends(get_current_admin)) -> Dict[str, An
 
 @api_router.put("/auth/change-password")
 async def change_password(payload: ChangePasswordRequest, admin: Dict[str, Any] = Depends(get_current_admin)) -> Dict[str, str]:
+    if not payload.new_password and not payload.new_email:
+        raise HTTPException(status_code=400, detail="Nothing to update.")
     full = await db.admins.find_one({"id": admin["id"]}, {"_id": 0})
     if not full or not pwd_context.verify(payload.current_password, full["password_hash"]):
         raise HTTPException(status_code=400, detail="Current password is incorrect.")
-    await db.admins.update_one({"id": admin["id"]}, {"$set": {"password_hash": pwd_context.hash(payload.new_password)}})
-    return {"detail": "Password changed successfully."}
+    updates: Dict[str, Any] = {}
+    if payload.new_password:
+        updates["password_hash"] = pwd_context.hash(payload.new_password)
+    if payload.new_email:
+        existing = await db.admins.find_one({"email": payload.new_email, "id": {"$ne": admin["id"]}}, {"_id": 0})
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already in use.")
+        updates["email"] = payload.new_email
+    await db.admins.update_one({"id": admin["id"]}, {"$set": updates})
+    return {"detail": "Profile updated successfully."}
 
 
 def require_role(*allowed_roles: str):

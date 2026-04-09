@@ -2379,7 +2379,7 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(() => new Date().toLocaleTimeString(language === "es" ? "es-ES" : "en-US"));
   const [pwOpen, setPwOpen] = useState(false);
-  const [pwForm, setPwForm] = useState({ current: "", next: "", confirm: "" });
+  const [pwForm, setPwForm] = useState({ current: "", next: "", confirm: "", email: "" });
   const [pwSaving, setPwSaving] = useState(false);
   const currentSection = location.pathname.split("/")[2] || "dashboard";
   const adminRole = session.admin?.role || "operator";
@@ -2577,7 +2577,7 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
               <p className="text-xs text-zinc-500">{session.admin?.email}</p>
               <span className="mt-1 inline-block rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs capitalize text-zinc-400" data-testid="admin-role-badge">{adminRole}</span>
             </div>
-            <Button className="touch-button mt-3 w-full rounded-full" data-testid="change-password-btn" onClick={() => { setPwOpen(true); setPwForm({ current: "", next: "", confirm: "" }); }} size="sm" variant="ghost">
+            <Button className="touch-button mt-3 w-full rounded-full" data-testid="change-password-btn" onClick={() => { setPwOpen(true); setPwForm({ current: "", next: "", confirm: "", email: "" }); }} size="sm" variant="ghost">
               <KeyRound className="mr-2 h-4 w-4" /> {t.changePassword}
             </Button>
             <Button className="touch-button mt-2 w-full rounded-full" data-testid="admin-logout-button" onClick={onLogout} type="button" variant="outline">
@@ -2590,18 +2590,30 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
                 <h3 className="mb-4 text-lg font-semibold text-white">{t.changePassword}</h3>
                 <form className="grid gap-3" data-testid="change-password-form" onSubmit={async (e) => {
                   e.preventDefault();
-                  if (pwForm.next.length < 8) { toast.error(t.passwordTooShort); return; }
-                  if (pwForm.next !== pwForm.confirm) { toast.error(t.passwordMismatch); return; }
+                  const hasNewPw = pwForm.next.length > 0;
+                  const hasNewEmail = pwForm.email.length > 0;
+                  if (!hasNewPw && !hasNewEmail) { toast.error(language === "es" ? "Nada que actualizar." : "Nothing to update."); return; }
+                  if (hasNewPw && pwForm.next.length < 8) { toast.error(t.passwordTooShort); return; }
+                  if (hasNewPw && pwForm.next !== pwForm.confirm) { toast.error(t.passwordMismatch); return; }
                   setPwSaving(true);
                   try {
-                    await adminApi.changePassword(session.token, { current_password: pwForm.current, new_password: pwForm.next });
+                    const body = { current_password: pwForm.current };
+                    if (hasNewPw) body.new_password = pwForm.next;
+                    if (hasNewEmail) body.new_email = pwForm.email;
+                    await adminApi.changePassword(session.token, body);
                     toast.success(t.passwordChanged);
+                    if (hasNewEmail) {
+                      const updated = { ...session, admin: { ...session.admin, email: pwForm.email } };
+                      setSession(updated);
+                      localStorage.setItem("paws-admin-session", JSON.stringify(updated));
+                    }
                     setPwOpen(false);
                   } catch (err) { toast.error(err.message); } finally { setPwSaving(false); }
                 }}>
+                  <Input className="rounded-xl" data-testid="new-email-input" placeholder={t.newEmail || (language === "es" ? "Nuevo correo (opcional)" : "New email (optional)")} type="email" value={pwForm.email} onChange={(e) => setPwForm({ ...pwForm, email: e.target.value })} />
                   <Input className="rounded-xl" data-testid="current-password-input" placeholder={t.currentPassword} required type="password" value={pwForm.current} onChange={(e) => setPwForm({ ...pwForm, current: e.target.value })} />
-                  <Input className="rounded-xl" data-testid="new-password-input" minLength={8} placeholder={t.newPassword} required type="password" value={pwForm.next} onChange={(e) => setPwForm({ ...pwForm, next: e.target.value })} />
-                  <Input className="rounded-xl" data-testid="confirm-password-input" minLength={8} placeholder={t.confirmPassword} required type="password" value={pwForm.confirm} onChange={(e) => setPwForm({ ...pwForm, confirm: e.target.value })} />
+                  <Input className="rounded-xl" data-testid="new-password-input" placeholder={language === "es" ? "Nueva contraseña (opcional)" : "New password (optional)"} type="password" value={pwForm.next} onChange={(e) => setPwForm({ ...pwForm, next: e.target.value })} />
+                  {pwForm.next && <Input className="rounded-xl" data-testid="confirm-password-input" minLength={8} placeholder={t.confirmPassword} required type="password" value={pwForm.confirm} onChange={(e) => setPwForm({ ...pwForm, confirm: e.target.value })} />}
                   <div className="flex gap-2 pt-2">
                     <Button className="flex-1 rounded-full" data-testid="cancel-password-btn" onClick={() => setPwOpen(false)} type="button" variant="outline">{language === "es" ? "Cancelar" : "Cancel"}</Button>
                     <Button className="flex-1 rounded-full" data-testid="submit-password-btn" disabled={pwSaving} type="submit">{pwSaving ? "..." : (language === "es" ? "Guardar" : "Save")}</Button>
