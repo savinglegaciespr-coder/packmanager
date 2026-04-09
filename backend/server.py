@@ -307,6 +307,23 @@ def sanitize_booking(booking_doc: Dict[str, Any]) -> Dict[str, Any]:
     return booking
 
 
+OPERATOR_FINANCIAL_FIELDS = {
+    "program_price", "deposit_amount", "balance_amount",
+    "overall_payment_status", "program_snapshot",
+}
+
+OPERATOR_ALLOWED_UPDATE_FIELDS = {"status"}
+
+
+def sanitize_booking_for_operator(booking: Dict[str, Any]) -> Dict[str, Any]:
+    result = {k: v for k, v in booking.items() if k not in OPERATOR_FINANCIAL_FIELDS}
+    if "payment_status" in result:
+        result["payment_status"] = "Paid" if result["payment_status"] == "Verified" else "Pending"
+    if "final_payment_status" in result:
+        result["final_payment_status"] = "Paid" if result["final_payment_status"] == "Verified" else "Pending"
+    return result
+
+
 def default_landing_content() -> Dict[str, Any]:
     return {
         "hero_description_es": "PAWS TRAINING combina una experiencia de reserva clara para clientes con un panel administrativo robusto para validar documentos, pagos y ocupación por semana.",
@@ -1646,7 +1663,7 @@ async def create_public_booking(
 
 
 @api_router.get("/admin/dashboard")
-async def get_dashboard(_: Dict[str, Any] = Depends(get_current_admin)) -> Dict[str, Any]:
+async def get_dashboard(_: Dict[str, Any] = Depends(require_role("superadmin", "admin"))) -> Dict[str, Any]:
     return await build_dashboard_payload()
 
 
@@ -1656,7 +1673,7 @@ async def get_admin_bookings(
     program_id: Optional[str] = None,
     week_start: Optional[str] = None,
     search: Optional[str] = None,
-    _: Dict[str, Any] = Depends(get_current_admin),
+    admin: Dict[str, Any] = Depends(get_current_admin),
 ) -> List[Dict[str, Any]]:
     await expire_stale_bookings()
     bookings = [sanitize_booking(item) for item in await db.bookings.find({}, {"_id": 0}).sort("created_at", -1).to_list(2000)]
@@ -1673,19 +1690,24 @@ async def get_admin_bookings(
             for booking in bookings
             if search_value in booking["owner"]["full_name"].lower() or search_value in booking["dog"]["name"].lower()
         ]
+    if admin.get("role", "operator") == "operator":
+        bookings = [sanitize_booking_for_operator(b) for b in bookings]
     return bookings
 
 
 @api_router.get("/admin/bookings/{booking_id}")
-async def get_booking_detail(booking_id: str, _: Dict[str, Any] = Depends(get_current_admin)) -> Dict[str, Any]:
+async def get_booking_detail(booking_id: str, admin: Dict[str, Any] = Depends(get_current_admin)) -> Dict[str, Any]:
     booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found.")
-    return sanitize_booking(booking)
+    result = sanitize_booking(booking)
+    if admin.get("role", "operator") == "operator":
+        result = sanitize_booking_for_operator(result)
+    return result
 
 
 @api_router.patch("/admin/bookings/{booking_id}")
-async def update_booking(booking_id: str, payload: BookingUpdateRequest, _: Dict[str, Any] = Depends(get_current_admin)) -> Dict[str, Any]:
+async def update_booking(booking_id: str, payload: BookingUpdateRequest, admin: Dict[str, Any] = Depends(get_current_admin)) -> Dict[str, Any]:
     booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found.")
@@ -1693,6 +1715,12 @@ async def update_booking(booking_id: str, payload: BookingUpdateRequest, _: Dict
     updates = payload.model_dump(exclude_none=True)
     if not updates:
         return sanitize_booking(booking)
+
+    caller_role = admin.get("role", "operator")
+    if caller_role == "operator":
+        forbidden = set(updates.keys()) - OPERATOR_ALLOWED_UPDATE_FIELDS
+        if forbidden:
+            raise HTTPException(status_code=403, detail=f"Operators can only update: {', '.join(OPERATOR_ALLOWED_UPDATE_FIELDS)}.")
 
     if updates.get("status") and updates["status"] not in VALID_BOOKING_STATUSES:
         raise HTTPException(status_code=400, detail="Invalid booking status.")
@@ -1740,7 +1768,7 @@ async def update_booking(booking_id: str, payload: BookingUpdateRequest, _: Dict
 
 
 @api_router.post("/admin/bookings/manual")
-async def create_manual_booking(payload: ManualBookingCreate, _: Dict[str, Any] = Depends(get_current_admin)) -> Dict[str, Any]:
+async def create_manual_booking(payload: ManualBookingCreate, _: Dict[str, Any] = Depends(require_role("superadmin", "admin"))) -> Dict[str, Any]:
     if payload.status not in VALID_BOOKING_STATUSES:
         raise HTTPException(status_code=400, detail="Invalid manual booking status.")
     if payload.payment_status not in DOC_STATUS_VALUES or payload.vaccination_certificate_status not in DOC_STATUS_VALUES:
@@ -1819,7 +1847,7 @@ async def get_admin_programs(_: Dict[str, Any] = Depends(get_current_admin)) -> 
 
 
 @api_router.post("/admin/programs")
-async def create_program(payload: ProgramPayload, _: Dict[str, Any] = Depends(get_current_admin)) -> Dict[str, Any]:
+async def create_program(payload: ProgramPayload, _: Dict[str, Any] = Depends(require_role("superadmin"))) -> Dict[str, Any]:
     now = iso_now()
     program_doc = payload.model_dump()
     program_doc["id"] = f"program-{uuid.uuid4().hex[:8]}"
@@ -1830,7 +1858,7 @@ async def create_program(payload: ProgramPayload, _: Dict[str, Any] = Depends(ge
 
 
 @api_router.put("/admin/programs/{program_id}")
-async def update_program(program_id: str, payload: ProgramPayload, _: Dict[str, Any] = Depends(get_current_admin)) -> Dict[str, Any]:
+async def update_program(program_id: str, payload: ProgramPayload, _: Dict[str, Any] = Depends(require_role("superadmin"))) -> Dict[str, Any]:
     existing = await db.programs.find_one({"id": program_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Program not found.")
@@ -1847,7 +1875,7 @@ async def get_capacity(_: Dict[str, Any] = Depends(get_current_admin), count: in
 
 
 @api_router.put("/admin/capacity/{week_start}")
-async def update_capacity(week_start: str, payload: CapacityUpdate, _: Dict[str, Any] = Depends(get_current_admin)) -> Dict[str, Any]:
+async def update_capacity(week_start: str, payload: CapacityUpdate, _: Dict[str, Any] = Depends(require_role("superadmin"))) -> Dict[str, Any]:
     normalized = parse_week_start(week_start).isoformat()
     existing = await db.week_capacities.find_one({"week_start": normalized}, {"_id": 0})
     if existing:
@@ -1908,7 +1936,7 @@ async def upload_landing_hero_image(file: UploadFile = File(...), _: Dict[str, A
 
 
 @api_router.get("/admin/email-logs")
-async def get_email_logs(_: Dict[str, Any] = Depends(get_current_admin)) -> List[Dict[str, Any]]:
+async def get_email_logs(_: Dict[str, Any] = Depends(require_role("superadmin", "admin"))) -> List[Dict[str, Any]]:
     return await db.email_logs.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
 
 
@@ -1931,7 +1959,7 @@ async def get_document(booking_id: str, document_type: str, _: Dict[str, Any] = 
 
 
 @api_router.post("/admin/bookings/{booking_id}/final-payment-proof")
-async def upload_final_payment_proof(booking_id: str, file: UploadFile = File(...), _: Dict[str, Any] = Depends(get_current_admin)) -> Dict[str, Any]:
+async def upload_final_payment_proof(booking_id: str, file: UploadFile = File(...), _: Dict[str, Any] = Depends(require_role("superadmin", "admin"))) -> Dict[str, Any]:
     booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found.")

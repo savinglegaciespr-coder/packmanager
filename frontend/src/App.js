@@ -1070,8 +1070,9 @@ const AdminLoginPage = ({ config, language, setLanguage, onLogin, showAdminAcces
     event.preventDefault();
     setLoading(true);
     try {
-      await onLogin(formState);
-      navigate("/admin/dashboard");
+      const response = await onLogin(formState);
+      const userRole = response.admin?.role || "operator";
+      navigate(userRole === "operator" ? "/admin/bookings" : "/admin/dashboard");
     } catch (error) {
       toast.error(error.message);
     } finally {
@@ -1710,9 +1711,11 @@ const BookingsView = ({ bookings, programs, token, language, onUpdateBooking, on
               <CardTitle className="text-white">{t.bookings}</CardTitle>
               <CardDescription className="text-zinc-400">{filteredBookings.length} {language === "es" ? "reservas visibles" : "visible bookings"}</CardDescription>
             </div>
-            <Button className="touch-button rounded-full bg-primary text-white hover:bg-red-700" data-testid="open-manual-booking-button" onClick={() => setManualOpen(true)} type="button">
-              {t.manualBooking}
-            </Button>
+            {onManualCreate && (
+              <Button className="touch-button rounded-full bg-primary text-white hover:bg-red-700" data-testid="open-manual-booking-button" onClick={() => setManualOpen(true)} type="button">
+                {t.manualBooking}
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent className="grid gap-4">
@@ -2351,22 +2354,26 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
   const currentSection = location.pathname.split("/")[2] || "dashboard";
   const adminRole = session.admin?.role || "operator";
 
+  const isOperator = adminRole === "operator";
+
   const refreshAll = useCallback(async (showLoader = true) => {
     if (showLoader) {
       setLoading(true);
     }
     try {
-      const basePromises = [
-        adminApi.getDashboard(session.token),
-        adminApi.getBookings(session.token),
-        adminApi.getPrograms(session.token),
-        adminApi.getCapacity(session.token),
-      ];
-      const [dashboardResponse, bookingsResponse, programsResponse, capacityResponse] = await Promise.all(basePromises);
-      setDashboard(dashboardResponse);
+      const bookingsResponse = await adminApi.getBookings(session.token);
       setBookings(bookingsResponse);
-      setPrograms(programsResponse);
-      setCapacityWeeks(capacityResponse);
+
+      if (!isOperator) {
+        const [dashboardResponse, programsResponse, capacityResponse] = await Promise.all([
+          adminApi.getDashboard(session.token),
+          adminApi.getPrograms(session.token),
+          adminApi.getCapacity(session.token),
+        ]);
+        setDashboard(dashboardResponse);
+        setPrograms(programsResponse);
+        setCapacityWeeks(capacityResponse);
+      }
 
       if (adminRole === "superadmin") {
         const [settingsResponse, emailLogsResponse] = await Promise.all([
@@ -2387,13 +2394,13 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
         setLoading(false);
       }
     }
-  }, [adminRole, language, navigate, onLogout, session.token]);
+  }, [adminRole, isOperator, language, navigate, onLogout, session.token]);
 
   useEffect(() => {
     if (location.pathname === "/admin") {
-      navigate("/admin/dashboard", { replace: true });
+      navigate(isOperator ? "/admin/bookings" : "/admin/dashboard", { replace: true });
     }
-  }, [location.pathname, navigate]);
+  }, [isOperator, location.pathname, navigate]);
 
   useEffect(() => {
     refreshAll();
@@ -2500,14 +2507,16 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
     }
   };
 
+  const isSuperadminOrAdmin = adminRole === "superadmin" || adminRole === "admin";
+
   const navigationItems = [
-    { key: "dashboard", label: t.dashboard, icon: LayoutDashboard },
-    { key: "operations-screen", label: t.operationsScreenNav, icon: Home },
+    ...(isSuperadminOrAdmin ? [{ key: "dashboard", label: t.dashboard, icon: LayoutDashboard }] : []),
+    ...(isSuperadminOrAdmin ? [{ key: "operations-screen", label: t.operationsScreenNav, icon: Home }] : []),
     { key: "bookings", label: t.bookings, icon: FileText },
-    { key: "weekly-operations", label: t.weeklyOperationsNav, icon: CalendarRange },
-    { key: "programs", label: t.programs, icon: Dog },
-    { key: "capacity", label: t.capacity, icon: CalendarRange },
-    ...(adminRole === "superadmin" || adminRole === "admin" ? [{ key: "users", label: t.userManagement, icon: Users }] : []),
+    ...(isSuperadminOrAdmin ? [{ key: "weekly-operations", label: t.weeklyOperationsNav, icon: CalendarRange }] : []),
+    ...(adminRole === "superadmin" ? [{ key: "programs", label: t.programs, icon: Dog }] : []),
+    ...(adminRole === "superadmin" ? [{ key: "capacity", label: t.capacity, icon: CalendarRange }] : []),
+    ...(isSuperadminOrAdmin ? [{ key: "users", label: t.userManagement, icon: Users }] : []),
     ...(adminRole === "superadmin" ? [{ key: "settings", label: t.settings, icon: Settings }] : []),
   ];
 
@@ -2557,8 +2566,8 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
             <Card className="surface-panel rounded-[2rem] border-white/10 p-10 text-center text-zinc-400">{t.loadingAdmin}</Card>
           ) : (
             <>
-              {currentSection === "dashboard" && <DashboardView currencyCode={config?.currency || "USD"} dashboard={dashboard} language={language} />}
-              {currentSection === "operations-screen" && (
+              {currentSection === "dashboard" && isSuperadminOrAdmin && <DashboardView currencyCode={config?.currency || "USD"} dashboard={dashboard} language={language} />}
+              {currentSection === "operations-screen" && isSuperadminOrAdmin && (
                 <OperationsScreenView
                   bookings={bookings}
                   capacityWeeks={capacityWeeks}
@@ -2573,16 +2582,16 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
                   capacityWeeks={capacityWeeks}
                   currencyCode={config?.currency || "USD"}
                   language={language}
-                  onManualCreate={createManualBooking}
+                  onManualCreate={isSuperadminOrAdmin ? createManualBooking : null}
                   onUpdateBooking={saveBooking}
-                  onFinalPaymentUpload={uploadFinalPaymentProof}
+                  onFinalPaymentUpload={isSuperadminOrAdmin ? uploadFinalPaymentProof : null}
                   programs={programs}
                   token={session.token}
                 />
               )}
-              {currentSection === "weekly-operations" && <WeeklyOperationsView bookings={bookings} capacityWeeks={capacityWeeks} language={language} />}
-              {currentSection === "programs" && <ProgramsView currencyCode={config?.currency || "USD"} language={language} onSaveProgram={saveProgram} programs={programs} />}
-              {currentSection === "capacity" && <CapacityView capacityWeeks={capacityWeeks} language={language} onSaveCapacity={saveCapacity} />}
+              {currentSection === "weekly-operations" && isSuperadminOrAdmin && <WeeklyOperationsView bookings={bookings} capacityWeeks={capacityWeeks} language={language} />}
+              {currentSection === "programs" && adminRole === "superadmin" && <ProgramsView currencyCode={config?.currency || "USD"} language={language} onSaveProgram={saveProgram} programs={programs} />}
+              {currentSection === "capacity" && adminRole === "superadmin" && <CapacityView capacityWeeks={capacityWeeks} language={language} onSaveCapacity={saveCapacity} />}
               {currentSection === "settings" && adminRole === "superadmin" && (
                 <SettingsView
                   emailLogs={emailLogs}
