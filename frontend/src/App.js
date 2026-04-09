@@ -1191,11 +1191,12 @@ const DocActionButtons = ({ label, icon: Icon, hasFile, onPreview, onOpenTab, on
   </div>
 );
 
-const BookingDetailDialog = ({ booking, language, onClose, onSave, token, currencyCode, onFinalPaymentUpload }) => {
+const BookingDetailDialog = ({ booking, language, onClose, onSave, token, currencyCode, onFinalPaymentUpload, adminRole }) => {
   const t = translations[language];
   const [formState, setFormState] = useState(null);
   const [uploadingFinal, setUploadingFinal] = useState(false);
   const [previewDoc, setPreviewDoc] = useState(null);
+  const isOp = adminRole === "operator";
 
   useEffect(() => {
     if (booking) {
@@ -1217,11 +1218,15 @@ const BookingDetailDialog = ({ booking, language, onClose, onSave, token, curren
   const overallPayment = booking.overall_payment_status || "Deposit Pending";
 
   const saveChanges = async () => {
-    await onSave(booking.id, {
-      ...formState,
-      intake_date: scheduleDates.intake_date || null,
-      delivery_date: scheduleDates.delivery_date || null,
-    });
+    // Operators can only update status field
+    const payload = isOp
+      ? { status: formState.status }
+      : {
+          ...formState,
+          intake_date: scheduleDates.intake_date || null,
+          delivery_date: scheduleDates.delivery_date || null,
+        };
+    await onSave(booking.id, payload);
     onClose();
   };
 
@@ -1276,13 +1281,27 @@ const BookingDetailDialog = ({ booking, language, onClose, onSave, token, curren
             <div data-testid="booking-program-summary">
               <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{t.programName}</p>
               <p className="mt-2 text-sm text-zinc-200">{language === "es" ? booking.program_name_es : booking.program_name_en}</p>
-              <p className="text-sm text-zinc-400">{t.reservationSummaryPrice}: {formatCurrency(booking.program_price, language, currencyCode)}</p>
-              <p className="text-sm text-zinc-400">{t.depositLabel}: {formatCurrency(booking.deposit_amount, language, currencyCode)} · {t.balanceLabel}: {formatCurrency(booking.balance_amount, language, currencyCode)}</p>
+              {!isOp && (
+                <>
+                  <p className="text-sm text-zinc-400">{t.reservationSummaryPrice}: {formatCurrency(booking.program_price, language, currencyCode)}</p>
+                  <p className="text-sm text-zinc-400">{t.depositLabel}: {formatCurrency(booking.deposit_amount, language, currencyCode)} · {t.balanceLabel}: {formatCurrency(booking.balance_amount, language, currencyCode)}</p>
+                </>
+              )}
             </div>
-            <div data-testid="booking-overall-payment">
-              <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{t.overallPaymentLabel}</p>
-              <Badge className={`mt-2 ${getStatusStyles(overallPayment)}`} data-testid="overall-payment-badge">{t.status[overallPayment] || overallPayment}</Badge>
-            </div>
+            {!isOp && (
+              <div data-testid="booking-overall-payment">
+                <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{t.overallPaymentLabel}</p>
+                <Badge className={`mt-2 ${getStatusStyles(overallPayment)}`} data-testid="overall-payment-badge">{t.status[overallPayment] || overallPayment}</Badge>
+              </div>
+            )}
+            {isOp && (
+              <div data-testid="booking-payment-status-simple">
+                <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{t.depositProofField}</p>
+                <p className="mt-1 text-sm text-zinc-200">{booking.payment_status === "Paid" || booking.payment_status === "Verified" ? (language === "es" ? "Pagado" : "Paid") : (language === "es" ? "Pendiente" : "Pending")}</p>
+                <p className="mt-2 text-xs uppercase tracking-[0.2em] text-zinc-500">{t.finalPaymentStatusField}</p>
+                <p className="mt-1 text-sm text-zinc-200">{booking.final_payment_status === "Paid" || booking.final_payment_status === "Verified" ? (language === "es" ? "Pagado" : "Paid") : (language === "es" ? "Pendiente" : "Pending")}</p>
+              </div>
+            )}
             <div className="flex flex-wrap gap-2" data-testid="medical-flags-panel">
               {booking.medical_flags.map((flag) => (
                 <span className="status-chip bg-black/20 text-zinc-200" key={flag.label}>{flag.label}</span>
@@ -1292,14 +1311,14 @@ const BookingDetailDialog = ({ booking, language, onClose, onSave, token, curren
               <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{t.documents}</p>
               <DocActionButtons hasFile={!!booking.payment_proof} icon={FileText} label={t.depositProofField} onDownload={() => handleDownload("payment_proof")} onOpenTab={() => handleOpenTab("payment_proof")} onPreview={() => handlePreview("payment_proof")} testIdPrefix="deposit-proof" />
               <DocActionButtons hasFile={!!booking.vaccination_certificate} icon={ShieldCheck} label={t.vaccinationCertificate} onDownload={() => handleDownload("vaccination_certificate")} onOpenTab={() => handleOpenTab("vaccination_certificate")} onPreview={() => handlePreview("vaccination_certificate")} testIdPrefix="vaccine-cert" />
-              {booking.final_payment_proof ? (
+              {!isOp && (booking.final_payment_proof ? (
                 <DocActionButtons hasFile icon={CreditCard} label={t.finalPaymentProofField} onDownload={() => handleDownload("final_payment_proof")} onOpenTab={() => handleOpenTab("final_payment_proof")} onPreview={() => handlePreview("final_payment_proof")} testIdPrefix="final-payment" />
               ) : (
                 <label className="touch-button inline-flex w-full cursor-pointer items-center justify-center rounded-full border border-dashed border-white/20 px-4 py-2.5 text-sm text-zinc-400 transition-colors hover:border-white/40 hover:text-white" data-testid="upload-final-payment-button">
                   <UploadCloud className="mr-2 h-4 w-4" /> {uploadingFinal ? "..." : t.uploadFinalPaymentProof}
                   <input accept=".pdf,image/*" className="hidden" disabled={uploadingFinal} onChange={handleFinalPaymentUpload} type="file" />
                 </label>
-              )}
+              ))}
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
@@ -1309,46 +1328,50 @@ const BookingDetailDialog = ({ booking, language, onClose, onSave, token, curren
                 {STATUS_OPTIONS.map((option) => <option key={option} value={option}>{t.status[option] || option}</option>)}
               </select>
             </div>
-            <div>
-              <label className="mb-2 block text-sm text-zinc-300" data-testid="payment-status-label">{t.depositProofField}</label>
-              <select className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="payment-status-select" onChange={(event) => setFormState((current) => ({ ...current, payment_status: event.target.value }))} value={formState.payment_status}>
-                {DOC_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{t.status[option] || option}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="mb-2 block text-sm text-zinc-300" data-testid="final-payment-status-label">{t.finalPaymentStatusField}</label>
-              <select className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="final-payment-status-select" onChange={(event) => setFormState((current) => ({ ...current, final_payment_status: event.target.value }))} value={formState.final_payment_status}>
-                {DOC_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{t.status[option] || option}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="mb-2 block text-sm text-zinc-300" data-testid="certificate-status-label">{t.vaccinationCertificateField}</label>
-              <select className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="certificate-status-select" onChange={(event) => setFormState((current) => ({ ...current, vaccination_certificate_status: event.target.value }))} value={formState.vaccination_certificate_status}>
-                {DOC_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{t.status[option] || option}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="mb-2 block text-sm text-zinc-300" data-testid="eligibility-status-label">{t.dogEligibilityField}</label>
-              <select className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="eligibility-status-select" onChange={(event) => setFormState((current) => ({ ...current, eligibility_status: event.target.value }))} value={formState.eligibility_status}>
-                {ELIGIBILITY_OPTIONS.map((option) => <option key={option} value={option}>{t.status[option] || option}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="mb-2 block text-sm text-zinc-300" data-testid="intake-date-label">{t.intakeDateField}</label>
-              <Input data-testid="intake-date-input" readOnly type="text" value={scheduleDates.intake_date} />
-            </div>
-            <div>
-              <label className="mb-2 block text-sm text-zinc-300" data-testid="delivery-date-label">{t.deliveryDateField}</label>
-              <Input data-testid="delivery-date-input" readOnly type="text" value={scheduleDates.delivery_date} />
-            </div>
-            <div className="md:col-span-2">
-              <label className="mb-2 block text-sm text-zinc-300" data-testid="rejection-reason-label">{t.rejectionReasonField}</label>
-              <Input data-testid="rejection-reason-input" onChange={(event) => setFormState((current) => ({ ...current, rejection_reason: event.target.value }))} placeholder={t.rejectionReasonField} value={formState.rejection_reason} />
-            </div>
-            <div className="md:col-span-2">
-              <label className="mb-2 block text-sm text-zinc-300" data-testid="internal-notes-label">{t.internalNotesField}</label>
-              <Textarea data-testid="internal-notes-textarea" onChange={(event) => setFormState((current) => ({ ...current, internal_notes: event.target.value }))} placeholder={t.internalNotesField} value={formState.internal_notes} />
-            </div>
+            {!isOp && (
+              <>
+                <div>
+                  <label className="mb-2 block text-sm text-zinc-300" data-testid="payment-status-label">{t.depositProofField}</label>
+                  <select className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="payment-status-select" onChange={(event) => setFormState((current) => ({ ...current, payment_status: event.target.value }))} value={formState.payment_status}>
+                    {DOC_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{t.status[option] || option}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm text-zinc-300" data-testid="final-payment-status-label">{t.finalPaymentStatusField}</label>
+                  <select className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="final-payment-status-select" onChange={(event) => setFormState((current) => ({ ...current, final_payment_status: event.target.value }))} value={formState.final_payment_status}>
+                    {DOC_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{t.status[option] || option}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm text-zinc-300" data-testid="certificate-status-label">{t.vaccinationCertificateField}</label>
+                  <select className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="certificate-status-select" onChange={(event) => setFormState((current) => ({ ...current, vaccination_certificate_status: event.target.value }))} value={formState.vaccination_certificate_status}>
+                    {DOC_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{t.status[option] || option}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm text-zinc-300" data-testid="eligibility-status-label">{t.dogEligibilityField}</label>
+                  <select className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="eligibility-status-select" onChange={(event) => setFormState((current) => ({ ...current, eligibility_status: event.target.value }))} value={formState.eligibility_status}>
+                    {ELIGIBILITY_OPTIONS.map((option) => <option key={option} value={option}>{t.status[option] || option}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm text-zinc-300" data-testid="intake-date-label">{t.intakeDateField}</label>
+                  <Input data-testid="intake-date-input" readOnly type="text" value={scheduleDates.intake_date} />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm text-zinc-300" data-testid="delivery-date-label">{t.deliveryDateField}</label>
+                  <Input data-testid="delivery-date-input" readOnly type="text" value={scheduleDates.delivery_date} />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="mb-2 block text-sm text-zinc-300" data-testid="rejection-reason-label">{t.rejectionReasonField}</label>
+                  <Input data-testid="rejection-reason-input" onChange={(event) => setFormState((current) => ({ ...current, rejection_reason: event.target.value }))} placeholder={t.rejectionReasonField} value={formState.rejection_reason} />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="mb-2 block text-sm text-zinc-300" data-testid="internal-notes-label">{t.internalNotesField}</label>
+                  <Textarea data-testid="internal-notes-textarea" onChange={(event) => setFormState((current) => ({ ...current, internal_notes: event.target.value }))} placeholder={t.internalNotesField} value={formState.internal_notes} />
+                </div>
+              </>
+            )}
             <div className="dialog-actions-row md:col-span-2">
               <Button className="touch-button" data-testid="close-booking-dialog-button" onClick={onClose} type="button" variant="outline">{t.close}</Button>
               <Button className="touch-button bg-primary text-white hover:bg-red-700" data-testid="save-booking-dialog-button" onClick={saveChanges} type="button">
@@ -1679,8 +1702,9 @@ const DashboardView = ({ dashboard, language, currencyCode }) => {
   );
 };
 
-const BookingsView = ({ bookings, programs, token, language, onUpdateBooking, onFinalPaymentUpload, onManualCreate, currencyCode, capacityWeeks }) => {
+const BookingsView = ({ bookings, programs, token, language, onUpdateBooking, onFinalPaymentUpload, onManualCreate, currencyCode, capacityWeeks, adminRole }) => {
   const t = translations[language];
+  const isOp = adminRole === "operator";
   const [filters, setFilters] = useState({ status: "all", programId: "all", weekStart: "all", search: "" });
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [manualOpen, setManualOpen] = useState(false);
@@ -1746,7 +1770,7 @@ const BookingsView = ({ bookings, programs, token, language, onUpdateBooking, on
                   <th className="px-4">Program</th>
                   <th className="px-4">Week</th>
                   <th className="px-4">Status</th>
-                  <th className="px-4">{t.overallPaymentLabel}</th>
+                  {!isOp && <th className="px-4">{t.overallPaymentLabel}</th>}
                 </tr>
               </thead>
               <tbody>
@@ -1759,9 +1783,11 @@ const BookingsView = ({ bookings, programs, token, language, onUpdateBooking, on
                     <td className="px-4 py-4">
                       <Badge className={getStatusStyles(booking.status)}>{t.status[booking.status] || booking.status}</Badge>
                     </td>
-                    <td className="rounded-r-2xl px-4 py-4 text-sm text-zinc-300">
-                      <Badge className={getStatusStyles(booking.overall_payment_status)}>{t.status[booking.overall_payment_status] || booking.overall_payment_status}</Badge>
-                    </td>
+                    {!isOp && (
+                      <td className="rounded-r-2xl px-4 py-4 text-sm text-zinc-300">
+                        <Badge className={getStatusStyles(booking.overall_payment_status)}>{t.status[booking.overall_payment_status] || booking.overall_payment_status}</Badge>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -1769,7 +1795,7 @@ const BookingsView = ({ bookings, programs, token, language, onUpdateBooking, on
           </div>
         </CardContent>
       </Card>
-      <BookingDetailDialog booking={selectedBooking} currencyCode={currencyCode} language={language} onClose={() => setSelectedBooking(null)} onFinalPaymentUpload={onFinalPaymentUpload} onSave={onUpdateBooking} token={token} />
+      <BookingDetailDialog adminRole={adminRole} booking={selectedBooking} currencyCode={currencyCode} language={language} onClose={() => setSelectedBooking(null)} onFinalPaymentUpload={onFinalPaymentUpload} onSave={onUpdateBooking} token={token} />
       <ManualBookingDialog capacityWeeks={capacityWeeks} language={language} onClose={() => setManualOpen(false)} onCreate={onManualCreate} open={manualOpen} programs={programs} />
     </div>
   );
@@ -1953,7 +1979,7 @@ const WeeklyOperationsView = ({ bookings, capacityWeeks, language }) => {
                       </div>
                       <div className="flex flex-wrap gap-2 text-xs">
                         <Badge className={getStatusStyles(booking.status)}>{t.bookingStatusLabel}: {t.status[booking.status] || booking.status}</Badge>
-                        <Badge className={getStatusStyles(booking.overall_payment_status)}>{t.overallPaymentLabel}: {t.status[booking.overall_payment_status] || booking.overall_payment_status}</Badge>
+                        {!isOp && <Badge className={getStatusStyles(booking.overall_payment_status)}>{t.overallPaymentLabel}: {t.status[booking.overall_payment_status] || booking.overall_payment_status}</Badge>}
                         <Badge className={getStatusStyles(booking.vaccination_certificate_status)}>{t.vaccinationValidationLabel}: {t.status[booking.vaccination_certificate_status] || booking.vaccination_certificate_status}</Badge>
                       </div>
                     </div>
@@ -2578,6 +2604,7 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
               )}
               {currentSection === "bookings" && (
                 <BookingsView
+                  adminRole={adminRole}
                   bookings={bookings}
                   capacityWeeks={capacityWeeks}
                   currencyCode={config?.currency || "USD"}

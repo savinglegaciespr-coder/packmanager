@@ -1,0 +1,57 @@
+{
+  "summary": "Completed comprehensive UI-level RBAC testing for role-based navigation and financial data visibility. All tests passed. Fixed 1 bug: operator save was sending all form fields instead of just status.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_19.json"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Fixed: BookingDetailDialog saveChanges() was sending all formState fields for operators, causing 403 error. Now correctly sends only {status} for operators."
+  ],
+  "updated_files": [
+    "/app/frontend/src/App.js"
+  ],
+  "success_rate": {
+    "backend": "N/A (frontend-only testing)",
+    "frontend": "100%"
+  },
+  "test_credentials": "Superadmin: admin@pawstraining.com / PawsAdmin2026!",
+  "seed_data_creation": "Created and cleaned up test users: tadmin@t.com (admin), top@t.com (operator)",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "UI-level RBAC fully tested. All role-based restrictions working correctly.",
+  "features_tested": {
+    "superadmin_nav_items": "✓ All 8 items visible: Panel, Modo Operaciones, Reservas, Vista semanal, Programas, Capacidad, Usuarios, Configuración",
+    "superadmin_dashboard_financial_data": "✓ Dashboard shows revenue numbers ($4369, $2780, etc.)",
+    "superadmin_booking_detail_all_fields": "✓ Shows: program price ($420), deposit amount, balance amount, overall payment badge, all form dropdowns",
+    "admin_nav_items": "✓ 5 items visible: Panel, Modo Operaciones, Reservas, Vista semanal, Usuarios. Hidden: Programas, Capacidad, Configuración",
+    "admin_dashboard_access": "✓ Can access dashboard",
+    "admin_bookings_access": "✓ Can access bookings with payment column visible",
+    "operator_nav_items": "✓ Only 1 item visible: Reservas. All others hidden",
+    "operator_redirect_to_bookings": "✓ Redirected to /admin/bookings after login",
+    "operator_booking_list_no_payment_column": "✓ Table headers: Client, Dog, Program, Week, Status (no Payment column)",
+    "operator_manual_booking_button_hidden": "✓ 'Crear reserva manual' button not visible",
+    "operator_booking_detail_financial_hidden": "✓ No program price, no deposit amount, no balance amount, no overall payment badge",
+    "operator_booking_detail_simple_payment": "✓ Shows 'Comprobante de depósito: Pendiente' and 'Pago final: Pendiente' without amounts",
+    "operator_booking_detail_only_status_dropdown": "✓ Only status dropdown visible. Hidden: payment_status, final_payment_status, certificate_status, eligibility_status, rejection_reason, internal_notes",
+    "operator_upload_final_payment_hidden": "✓ Upload final payment button not visible",
+    "operator_documents_section_visible": "✓ Deposit proof and vaccination certificate preview buttons visible",
+    "operator_can_change_status": "✓ Successfully changed booking status from 'Pending Review' to 'Cancelled'",
+    "public_landing_page": "✓ Loads correctly (no regression)"
+  },
+  "bug_fixed": {
+    "issue": "Operator save booking was failing with 403 error",
+    "root_cause": "saveChanges() in BookingDetailDialog was sending all formState fields including intake_date and delivery_date, but backend only allows operators to update 'status' field",
+    "fix": "Modified saveChanges() to send only {status: formState.status} when isOp is true",
+    "file": "/app/frontend/src/App.js",
+    "line": "1220-1230"
+  }
+}
