@@ -42,6 +42,7 @@ Single-page monolith: entire frontend in `/app/frontend/src/App.js`, backend in 
 17. Initialization Resilience — Auto-retry, error state, API timeout
 18. Health endpoint for Kubernetes deployment
 19. **Role-Based Access Control (RBAC)** — Three roles (superadmin, admin, operator) with granular permissions. Superadmin: full access + user management. Admin: create up to 3 operators. Operator: read-only dashboards/bookings. User management UI with role badges. Settings restricted to superadmin only. (Completed & Tested Feb 2026)
+20. **RBAC Endpoint Enforcement** — All backend endpoints now enforce role restrictions. Superadmin-only: settings, programs CRUD, capacity write. Admin+superadmin: dashboard, email-logs, manual booking, final payment upload. Operator: bookings (financial data stripped), status-only PATCH, documents. Frontend nav gated per role. (Completed & Tested Feb 2026)
 
 ## Key API Endpoints
 - `POST /api/auth/login` - Admin login
