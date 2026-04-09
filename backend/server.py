@@ -535,17 +535,19 @@ def build_seed_booking(
 
 
 async def ensure_demo_admin() -> None:
-    existing = await db.admins.find_one({"email": DEMO_ADMIN_EMAIL}, {"_id": 0})
-    if existing:
-        if "role" not in existing:
-            await db.admins.update_one({"email": DEMO_ADMIN_EMAIL}, {"$set": {"role": "superadmin"}})
-        return
-    admin_doc = {
-        "id": str(uuid.uuid4()),
+    existing = await db.admins.find_one({"role": "superadmin"}, {"_id": 0})
+    target = {
         "name": DEMO_ADMIN_NAME,
         "email": DEMO_ADMIN_EMAIL,
         "password_hash": pwd_context.hash(DEMO_ADMIN_PASSWORD),
         "role": "superadmin",
+    }
+    if existing:
+        await db.admins.update_one({"role": "superadmin"}, {"$set": target})
+        return
+    admin_doc = {
+        "id": str(uuid.uuid4()),
+        **target,
         "created_at": iso_now(),
     }
     await db.admins.insert_one(admin_doc.copy())
