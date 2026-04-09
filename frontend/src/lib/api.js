@@ -236,6 +236,30 @@ export const adminApi = {
       return normalizeError(error);
     }
   },
+  async getUsers(token) {
+    try {
+      const response = await client.get("/admin/users", authConfig(token));
+      return response.data;
+    } catch (error) {
+      return normalizeError(error);
+    }
+  },
+  async createUser(token, payload) {
+    try {
+      const response = await client.post("/admin/users", payload, authConfig(token));
+      return response.data;
+    } catch (error) {
+      return normalizeError(error);
+    }
+  },
+  async deleteUser(token, userId) {
+    try {
+      const response = await client.delete(`/admin/users/${userId}`, authConfig(token));
+      return response.data;
+    } catch (error) {
+      return normalizeError(error);
+    }
+  },
 };
 
 export const getProtectedDocumentUrl = (bookingId, documentType) => `${API_URL}/admin/documents/${bookingId}/${documentType}`;

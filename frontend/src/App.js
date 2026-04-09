@@ -51,6 +51,9 @@ import {
   ExternalLink,
   Download,
   Eye,
+  Users,
+  Trash2,
+  Plus,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -2222,6 +2225,117 @@ const RequireAdmin = ({ session, children }) => {
   return children;
 };
 
+const UserManagementView = ({ token, language, currentRole }) => {
+  const t = translations[language];
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ name: "", email: "", password: "", role: "operator" });
+
+  const loadUsers = useCallback(async () => {
+    try {
+      const data = await adminApi.getUsers(token);
+      setUsers(data);
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => { loadUsers(); }, [loadUsers]);
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    try {
+      await adminApi.createUser(token, form);
+      toast.success(t.userCreated);
+      setForm({ name: "", email: "", password: "", role: "operator" });
+      setShowForm(false);
+      loadUsers();
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleDelete = async (userId) => {
+    if (!window.confirm(t.confirmDeleteUser)) return;
+    try {
+      await adminApi.deleteUser(token, userId);
+      toast.success(t.userDeleted);
+      loadUsers();
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const roleLabel = (r) => r === "superadmin" ? t.roleSuperadmin : r === "admin" ? t.roleAdmin : t.roleOperator;
+  const roleBadgeClass = (r) => r === "superadmin" ? "bg-red-600/20 text-red-400 border-red-600/30" : r === "admin" ? "bg-amber-600/20 text-amber-400 border-amber-600/30" : "bg-zinc-600/20 text-zinc-400 border-zinc-600/30";
+
+  if (loading) return <Card className="surface-panel rounded-[2rem] border-white/10 p-10 text-center text-zinc-400">{t.loadingAdmin}</Card>;
+
+  return (
+    <div className="grid gap-6" data-testid="user-management-view">
+      <Card className="surface-panel rounded-[2rem] border-white/10">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-lg text-white">{t.userManagement}</CardTitle>
+          <Button className="rounded-full" data-testid="create-user-btn" onClick={() => setShowForm(!showForm)} size="sm">
+            <Plus className="mr-1 h-4 w-4" /> {t.createUser}
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {showForm && (
+            <form className="mb-6 grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 sm:grid-cols-2 lg:grid-cols-5" data-testid="create-user-form" onSubmit={handleCreate}>
+              <Input className="rounded-xl" data-testid="user-name-input" onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder={t.userName} required value={form.name} />
+              <Input className="rounded-xl" data-testid="user-email-input" onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder={t.userEmail} required type="email" value={form.email} />
+              <Input className="rounded-xl" data-testid="user-password-input" minLength={6} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder={t.userPassword} required type="password" value={form.password} />
+              <select className="rounded-xl border border-white/10 bg-zinc-900 px-3 py-2 text-sm text-white" data-testid="user-role-select" onChange={(e) => setForm({ ...form, role: e.target.value })} value={form.role}>
+                {currentRole === "superadmin" && <option value="admin">{t.roleAdmin}</option>}
+                <option value="operator">{t.roleOperator}</option>
+              </select>
+              <Button className="rounded-xl" data-testid="submit-create-user-btn" type="submit">{t.createUser}</Button>
+            </form>
+          )}
+          {users.length === 0 ? (
+            <p className="text-center text-sm text-zinc-500">{t.noUsers}</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wider text-zinc-500">
+                    <th className="px-4 py-3">{t.userName}</th>
+                    <th className="px-4 py-3">{t.userEmail}</th>
+                    <th className="px-4 py-3">{t.userRole}</th>
+                    <th className="px-4 py-3" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((u) => (
+                    <tr className="border-b border-white/5 hover:bg-white/5" data-testid={`user-row-${u.id}`} key={u.id}>
+                      <td className="px-4 py-3 text-white">{u.name}</td>
+                      <td className="px-4 py-3 text-zinc-400">{u.email}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-block rounded-full border px-2 py-0.5 text-xs ${roleBadgeClass(u.role)}`}>{roleLabel(u.role)}</span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {u.role !== "superadmin" && (
+                          <Button className="h-8 rounded-full text-xs" data-testid={`delete-user-${u.id}`} onClick={() => handleDelete(u.id)} size="sm" variant="ghost">
+                            <Trash2 className="mr-1 h-3 w-3 text-red-500" /> {t.deleteUser}
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
 const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicData, config }) => {
   const t = translations[language];
   const location = useLocation();
@@ -2235,26 +2349,34 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(() => new Date().toLocaleTimeString(language === "es" ? "es-ES" : "en-US"));
   const currentSection = location.pathname.split("/")[2] || "dashboard";
+  const adminRole = session.admin?.role || "operator";
 
   const refreshAll = useCallback(async (showLoader = true) => {
     if (showLoader) {
       setLoading(true);
     }
     try {
-      const [dashboardResponse, bookingsResponse, programsResponse, capacityResponse, settingsResponse, emailLogsResponse] = await Promise.all([
+      const basePromises = [
         adminApi.getDashboard(session.token),
         adminApi.getBookings(session.token),
         adminApi.getPrograms(session.token),
         adminApi.getCapacity(session.token),
-        adminApi.getSettings(session.token),
-        adminApi.getEmailLogs(session.token),
-      ]);
+      ];
+      const [dashboardResponse, bookingsResponse, programsResponse, capacityResponse] = await Promise.all(basePromises);
       setDashboard(dashboardResponse);
       setBookings(bookingsResponse);
       setPrograms(programsResponse);
       setCapacityWeeks(capacityResponse);
-      setSettings(settingsResponse);
-      setEmailLogs(emailLogsResponse);
+
+      if (adminRole === "superadmin") {
+        const [settingsResponse, emailLogsResponse] = await Promise.all([
+          adminApi.getSettings(session.token),
+          adminApi.getEmailLogs(session.token),
+        ]);
+        setSettings(settingsResponse);
+        setEmailLogs(emailLogsResponse);
+      }
+
       setLastUpdated(new Date().toLocaleTimeString(language === "es" ? "es-ES" : "en-US"));
     } catch (error) {
       toast.error(error.message);
@@ -2265,7 +2387,7 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
         setLoading(false);
       }
     }
-  }, [language, navigate, onLogout, session.token]);
+  }, [adminRole, language, navigate, onLogout, session.token]);
 
   useEffect(() => {
     if (location.pathname === "/admin") {
@@ -2385,7 +2507,8 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
     { key: "weekly-operations", label: t.weeklyOperationsNav, icon: CalendarRange },
     { key: "programs", label: t.programs, icon: Dog },
     { key: "capacity", label: t.capacity, icon: CalendarRange },
-    { key: "settings", label: t.settings, icon: Settings },
+    ...(adminRole === "superadmin" || adminRole === "admin" ? [{ key: "users", label: t.userManagement, icon: Users }] : []),
+    ...(adminRole === "superadmin" ? [{ key: "settings", label: t.settings, icon: Settings }] : []),
   ];
 
   return (
@@ -2413,6 +2536,7 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
             <div className="rounded-2xl border border-white/10 bg-black/20 p-4" data-testid="admin-user-card">
               <p className="text-sm font-semibold text-white">{session.admin?.name}</p>
               <p className="text-xs text-zinc-500">{session.admin?.email}</p>
+              <span className="mt-1 inline-block rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs capitalize text-zinc-400" data-testid="admin-role-badge">{adminRole}</span>
             </div>
             <Button className="touch-button mt-4 w-full rounded-full" data-testid="admin-logout-button" onClick={onLogout} type="button" variant="outline">
               <LogOut className="mr-2 h-4 w-4" /> {t.logout}
@@ -2459,7 +2583,7 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
               {currentSection === "weekly-operations" && <WeeklyOperationsView bookings={bookings} capacityWeeks={capacityWeeks} language={language} />}
               {currentSection === "programs" && <ProgramsView currencyCode={config?.currency || "USD"} language={language} onSaveProgram={saveProgram} programs={programs} />}
               {currentSection === "capacity" && <CapacityView capacityWeeks={capacityWeeks} language={language} onSaveCapacity={saveCapacity} />}
-              {currentSection === "settings" && (
+              {currentSection === "settings" && adminRole === "superadmin" && (
                 <SettingsView
                   emailLogs={emailLogs}
                   language={language}
@@ -2467,6 +2591,13 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
                   onUploadLandingHeroImage={uploadLandingHeroImage}
                   onUploadLogo={uploadLogo}
                   settings={settings}
+                />
+              )}
+              {currentSection === "users" && (adminRole === "superadmin" || adminRole === "admin") && (
+                <UserManagementView
+                  currentRole={adminRole}
+                  language={language}
+                  token={session.token}
                 />
               )}
             </>
@@ -2563,7 +2694,12 @@ function App() {
     const validateSession = async () => {
       if (!session?.token) return;
       try {
-        await adminApi.me(session.token);
+        const freshAdmin = await adminApi.me(session.token);
+        if (freshAdmin.role && freshAdmin.role !== session.admin?.role) {
+          const updated = { ...session, admin: { ...session.admin, role: freshAdmin.role } };
+          setSession(updated);
+          localStorage.setItem("paws-admin-session", JSON.stringify(updated));
+        }
       } catch {
         localStorage.removeItem("paws-admin-session");
         setSession(null);

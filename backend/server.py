@@ -74,9 +74,19 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 
+VALID_ROLES = {"superadmin", "admin", "operator"}
+
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
+
+class CreateUserRequest(BaseModel):
+    name: str
+    email: EmailStr
+    password: str = Field(min_length=6)
+    role: Literal["admin", "operator"]
 
 
 class ProgramPayload(BaseModel):
@@ -504,12 +514,15 @@ def build_seed_booking(
 async def ensure_demo_admin() -> None:
     existing = await db.admins.find_one({"email": DEMO_ADMIN_EMAIL}, {"_id": 0})
     if existing:
+        if "role" not in existing:
+            await db.admins.update_one({"email": DEMO_ADMIN_EMAIL}, {"$set": {"role": "superadmin"}})
         return
     admin_doc = {
         "id": str(uuid.uuid4()),
         "name": DEMO_ADMIN_NAME,
         "email": DEMO_ADMIN_EMAIL,
         "password_hash": pwd_context.hash(DEMO_ADMIN_PASSWORD),
+        "role": "superadmin",
         "created_at": iso_now(),
     }
     await db.admins.insert_one(admin_doc.copy())
@@ -1390,12 +1403,92 @@ async def login(payload: LoginRequest) -> Dict[str, Any]:
     if not admin or not pwd_context.verify(payload.password, admin["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials.")
     token = create_access_token(admin)
-    return {"token": token, "admin": {"id": admin["id"], "name": admin["name"], "email": admin["email"]}}
+    return {"token": token, "admin": {"id": admin["id"], "name": admin["name"], "email": admin["email"], "role": admin.get("role", "operator")}}
 
 
 @api_router.get("/auth/me")
 async def me(admin: Dict[str, Any] = Depends(get_current_admin)) -> Dict[str, Any]:
     return admin
+
+
+def require_role(*allowed_roles: str):
+    async def _check(admin: Dict[str, Any] = Depends(get_current_admin)) -> Dict[str, Any]:
+        if admin.get("role", "operator") not in allowed_roles:
+            raise HTTPException(status_code=403, detail="Insufficient permissions.")
+        return admin
+    return _check
+
+
+@api_router.get("/admin/users")
+async def list_users(admin: Dict[str, Any] = Depends(require_role("superadmin", "admin"))) -> List[Dict[str, Any]]:
+    role = admin.get("role", "operator")
+    if role == "superadmin":
+        users = await db.admins.find({}, {"_id": 0, "password_hash": 0}).to_list(500)
+    else:
+        users = await db.admins.find(
+            {"created_by": admin["id"], "role": "operator"},
+            {"_id": 0, "password_hash": 0},
+        ).to_list(500)
+    for u in users:
+        u.setdefault("role", "operator")
+    return users
+
+
+@api_router.post("/admin/users")
+async def create_user(
+    payload: CreateUserRequest,
+    admin: Dict[str, Any] = Depends(require_role("superadmin", "admin")),
+) -> Dict[str, Any]:
+    caller_role = admin.get("role", "operator")
+
+    if caller_role == "admin":
+        if payload.role != "operator":
+            raise HTTPException(status_code=403, detail="Admins can only create operator accounts.")
+        count = await db.admins.count_documents({"created_by": admin["id"], "role": "operator"})
+        if count >= 3:
+            raise HTTPException(status_code=400, detail="Operator limit reached (max 3).")
+
+    if caller_role == "superadmin" and payload.role not in ("admin", "operator"):
+        raise HTTPException(status_code=400, detail="Invalid role.")
+
+    existing = await db.admins.find_one({"email": payload.email}, {"_id": 0})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered.")
+
+    user_doc = {
+        "id": str(uuid.uuid4()),
+        "name": payload.name,
+        "email": payload.email,
+        "password_hash": pwd_context.hash(payload.password),
+        "role": payload.role,
+        "created_by": admin["id"],
+        "created_at": iso_now(),
+    }
+    await db.admins.insert_one(user_doc.copy())
+    return {k: v for k, v in user_doc.items() if k not in ("_id", "password_hash")}
+
+
+@api_router.delete("/admin/users/{user_id}")
+async def delete_user(
+    user_id: str,
+    admin: Dict[str, Any] = Depends(require_role("superadmin", "admin")),
+) -> Dict[str, str]:
+    caller_role = admin.get("role", "operator")
+    target = await db.admins.find_one({"id": user_id}, {"_id": 0})
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    target_role = target.get("role", "operator")
+
+    if caller_role == "admin":
+        if target_role != "operator" or target.get("created_by") != admin["id"]:
+            raise HTTPException(status_code=403, detail="You can only delete operators you created.")
+
+    if caller_role == "superadmin" and target["id"] == admin["id"]:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account.")
+
+    await db.admins.delete_one({"id": user_id})
+    return {"detail": "User deleted."}
 
 
 @api_router.get("/public/config")
@@ -1767,13 +1860,13 @@ async def update_capacity(week_start: str, payload: CapacityUpdate, _: Dict[str,
 
 
 @api_router.get("/admin/settings")
-async def get_settings(_: Dict[str, Any] = Depends(get_current_admin)) -> Dict[str, Any]:
+async def get_settings(_: Dict[str, Any] = Depends(require_role("superadmin"))) -> Dict[str, Any]:
     settings_doc = await get_business_settings()
     return sanitize_settings(settings_doc)
 
 
 @api_router.put("/admin/settings")
-async def update_settings(payload: SettingsUpdate, _: Dict[str, Any] = Depends(get_current_admin)) -> Dict[str, Any]:
+async def update_settings(payload: SettingsUpdate, _: Dict[str, Any] = Depends(require_role("superadmin"))) -> Dict[str, Any]:
     updates = payload.model_dump(exclude_none=True)
     smtp_password = updates.pop("smtp_password", None)
     if smtp_password and smtp_password.strip():
@@ -1791,7 +1884,7 @@ async def update_settings(payload: SettingsUpdate, _: Dict[str, Any] = Depends(g
 
 
 @api_router.post("/admin/settings/logo")
-async def upload_logo(file: UploadFile = File(...), _: Dict[str, Any] = Depends(get_current_admin)) -> Dict[str, str]:
+async def upload_logo(file: UploadFile = File(...), _: Dict[str, Any] = Depends(require_role("superadmin"))) -> Dict[str, str]:
     branding_dir = UPLOAD_DIR / "branding"
     branding_dir.mkdir(parents=True, exist_ok=True)
     logo_asset = await save_upload(file, branding_dir, "brand-logo")
@@ -1803,7 +1896,7 @@ async def upload_logo(file: UploadFile = File(...), _: Dict[str, Any] = Depends(
 
 
 @api_router.post("/admin/settings/landing-hero-image")
-async def upload_landing_hero_image(file: UploadFile = File(...), _: Dict[str, Any] = Depends(get_current_admin)) -> Dict[str, str]:
+async def upload_landing_hero_image(file: UploadFile = File(...), _: Dict[str, Any] = Depends(require_role("superadmin"))) -> Dict[str, str]:
     branding_dir = UPLOAD_DIR / "branding"
     branding_dir.mkdir(parents=True, exist_ok=True)
     hero_asset = await save_upload(file, branding_dir, "landing-hero")
