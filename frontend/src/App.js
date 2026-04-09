@@ -2695,7 +2695,7 @@ const AppRoutes = ({ publicState, session, setSession, language, setLanguage, re
 
   return (
     <Routes>
-      <Route path="/" element={<LandingPage config={publicState.config} language={language} programs={publicState.programs} setLanguage={setLanguage} showAdminAccess={showAdminAccess} />} />
+      <Route path="/" element={<LandingPage config={publicState.config} language={language} programs={publicState.programs} setLanguage={setLanguage} />} />
       <Route path="/book" element={<BookingPage config={publicState.config} language={language} programs={publicState.programs} setLanguage={setLanguage} showAdminAccess={showAdminAccess} />} />
       <Route path="/payment/:token" element={<FinalPaymentPage language={language} setLanguage={setLanguage} />} />
       <Route path="/admin/login" element={<AdminLoginPage config={publicState.config} language={language} onLogin={handleLogin} setLanguage={setLanguage} showAdminAccess={showAdminAccess} />} />
