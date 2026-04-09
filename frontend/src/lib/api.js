@@ -260,6 +260,14 @@ export const adminApi = {
       return normalizeError(error);
     }
   },
+  async changePassword(token, payload) {
+    try {
+      const response = await client.put("/auth/change-password", payload, authConfig(token));
+      return response.data;
+    } catch (error) {
+      return normalizeError(error);
+    }
+  },
 };
 
 export const getProtectedDocumentUrl = (bookingId, documentType) => `${API_URL}/admin/documents/${bookingId}/${documentType}`;

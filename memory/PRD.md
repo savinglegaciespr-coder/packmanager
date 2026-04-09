@@ -44,6 +44,7 @@ Single-page monolith: entire frontend in `/app/frontend/src/App.js`, backend in 
 19. **Role-Based Access Control (RBAC)** — Three roles (superadmin, admin, operator) with granular permissions. Superadmin: full access + user management. Admin: create up to 3 operators. Operator: read-only dashboards/bookings. User management UI with role badges. Settings restricted to superadmin only. (Completed & Tested Feb 2026)
 20. **RBAC Endpoint Enforcement** — All backend endpoints now enforce role restrictions. Superadmin-only: settings, programs CRUD, capacity write. Admin+superadmin: dashboard, email-logs, manual booking, final payment upload. Operator: bookings (financial data stripped), status-only PATCH, documents. Frontend nav gated per role. (Completed & Tested Feb 2026)
 21. **RBAC Frontend UI Enforcement** — Complete DOM-level role restrictions. Operator booking detail hides price/deposit/balance/overall payment, shows only Paid/Pending status, form limited to status dropdown only. Admin hides Programs/Capacity/Settings. Navigation items dynamically built per role. Operator redirects to /admin/bookings on login. (Completed & Tested Feb 2026)
+22. **Change Password** — All roles can change their own password via sidebar modal. Backend validates current password, enforces 8-char minimum. Uses existing bcrypt/passlib hashing. (Completed & Tested Feb 2026)
 
 ## Key API Endpoints
 - `POST /api/auth/login` - Admin login

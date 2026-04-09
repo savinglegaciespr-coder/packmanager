@@ -89,6 +89,11 @@ class CreateUserRequest(BaseModel):
     role: Literal["admin", "operator"]
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8)
+
+
 class ProgramPayload(BaseModel):
     name_es: str
     name_en: str
@@ -1426,6 +1431,15 @@ async def login(payload: LoginRequest) -> Dict[str, Any]:
 @api_router.get("/auth/me")
 async def me(admin: Dict[str, Any] = Depends(get_current_admin)) -> Dict[str, Any]:
     return admin
+
+
+@api_router.put("/auth/change-password")
+async def change_password(payload: ChangePasswordRequest, admin: Dict[str, Any] = Depends(get_current_admin)) -> Dict[str, str]:
+    full = await db.admins.find_one({"id": admin["id"]}, {"_id": 0})
+    if not full or not pwd_context.verify(payload.current_password, full["password_hash"]):
+        raise HTTPException(status_code=400, detail="Current password is incorrect.")
+    await db.admins.update_one({"id": admin["id"]}, {"$set": {"password_hash": pwd_context.hash(payload.new_password)}})
+    return {"detail": "Password changed successfully."}
 
 
 def require_role(*allowed_roles: str):
