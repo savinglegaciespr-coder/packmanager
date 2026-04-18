@@ -2255,7 +2255,7 @@ const RequireAdmin = ({ session, children }) => {
   return children;
 };
 
-const UserManagementView = ({ token, language, currentRole }) => {
+const UserManagementView = ({ token, language, currentRole, currentUserId }) => {
   const t = translations[language];
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2348,7 +2348,7 @@ const UserManagementView = ({ token, language, currentRole }) => {
                         <span className={`inline-block rounded-full border px-2 py-0.5 text-xs ${roleBadgeClass(u.role)}`}>{roleLabel(u.role)}</span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {u.role !== "superadmin" && (
+                        {u.id !== currentUserId && (
                           <Button className="h-8 rounded-full text-xs" data-testid={`delete-user-${u.id}`} onClick={() => handleDelete(u.id)} size="sm" variant="ghost">
                             <Trash2 className="mr-1 h-3 w-3 text-red-500" /> {t.deleteUser}
                           </Button>
@@ -2677,6 +2677,7 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
               {currentSection === "users" && (adminRole === "superadmin" || adminRole === "admin") && (
                 <UserManagementView
                   currentRole={adminRole}
+                  currentUserId={session.admin?.id}
                   language={language}
                   token={session.token}
                 />
