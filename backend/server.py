@@ -535,11 +535,6 @@ def build_seed_booking(
 
 
 async def ensure_demo_admin() -> None:
-    # Remove any stale superadmin accounts that don't match current .env email
-    await db.admins.delete_many({
-        "role": "superadmin",
-        "email": {"$ne": DEMO_ADMIN_EMAIL}
-    })
     existing = await db.admins.find_one({"email": DEMO_ADMIN_EMAIL}, {"_id": 0})
     target = {
         "name": DEMO_ADMIN_NAME,
