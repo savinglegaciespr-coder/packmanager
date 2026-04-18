@@ -386,7 +386,7 @@ def default_settings() -> Dict[str, Any]:
         "contact_email": "hola@pawstraining.com",
         "contact_phone": "+34 600 123 456",
         "contact_address": "Madrid, España",
-        "admin_notification_email": "admin@pawstraining.com",
+        "admin_notification_email": DEMO_ADMIN_EMAIL,
         "logo_url": "",
         "logo_asset": None,
         "landing_hero_image_url": "",
@@ -832,7 +832,7 @@ async def ensure_seed_data() -> None:
         sample_logs = [
             {
                 "id": str(uuid.uuid4()),
-                "recipient": "admin@pawstraining.com",
+                "recipient": DEMO_ADMIN_EMAIL,
                 "subject": "Nueva reserva pendiente — Nina",
                 "body": "Nueva reserva enviada por Diego Martín para Nina en la semana 2026-03-30. Estado inicial: Pending Review.",
                 "audience": "admin",
