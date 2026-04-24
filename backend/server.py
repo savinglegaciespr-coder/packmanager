@@ -1709,26 +1709,43 @@ async def get_admin_bookings(
     program_id: Optional[str] = None,
     week_start: Optional[str] = None,
     search: Optional[str] = None,
+    page: int = 1,
+    limit: int = 20,
     admin: Dict[str, Any] = Depends(get_current_admin),
-) -> List[Dict[str, Any]]:
+) -> Dict[str, Any]:
     await expire_stale_bookings()
-    bookings = [sanitize_booking(item) for item in await db.bookings.find({}, {"_id": 0}).sort("created_at", -1).to_list(2000)]
+    
+    query: Dict[str, Any] = {}
     if status_filter:
-        bookings = [booking for booking in bookings if booking["status"] == status_filter]
+        query["status"] = status_filter
     if program_id:
-        bookings = [booking for booking in bookings if booking["program_id"] == program_id]
+        query["program_id"] = program_id
     if week_start:
-        bookings = [booking for booking in bookings if booking["start_week"] == week_start]
+        query["start_week"] = week_start
     if search:
-        search_value = search.lower()
-        bookings = [
-            booking
-            for booking in bookings
-            if search_value in booking["owner"]["full_name"].lower() or search_value in booking["dog"]["name"].lower()
+        query["$or"] = [
+            {"owner.full_name": {"$regex": search, "$options": "i"}},
+            {"dog.name": {"$regex": search, "$options": "i"}}
         ]
+        
+    total = await db.bookings.count_documents(query)
+    
+    skip = (page - 1) * limit
+    cursor = db.bookings.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit)
+    
+    raw_bookings = await cursor.to_list(length=limit)
+    bookings = [sanitize_booking(b) for b in raw_bookings]
+    
     if admin.get("role", "operator") == "operator":
         bookings = [sanitize_booking_for_operator(b) for b in bookings]
-    return bookings
+        
+    return {
+        "bookings": bookings,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "total_pages": math.ceil(total / limit) if limit > 0 else 0
+    }
 
 
 @api_router.get("/admin/bookings/{booking_id}")
