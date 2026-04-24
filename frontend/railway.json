@@ -5,6 +5,7 @@
     "dockerfilePath": "Dockerfile"
   },
   "deploy": {
+    "startCommand": "serve -s /app/build -l $PORT",
     "healthcheckPath": "/"
   }
 }
