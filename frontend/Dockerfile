@@ -5,8 +5,8 @@ ENV REACT_APP_BACKEND_URL=$REACT_APP_BACKEND_URL
 
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
-RUN npm install
+COPY package.json .npmrc* ./
+RUN npm install --legacy-peer-deps
 
 COPY . .
 RUN npm run build
