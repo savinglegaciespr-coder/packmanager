@@ -19,6 +19,6 @@ RUN npm install --legacy-peer-deps && \
 COPY . .
 RUN npm run build
 
-RUN npm install -g serve
+RUN npm install -g serve@13
 
-CMD serve -s build -l ${PORT:-3000}
+CMD ["sh", "-c", "serve -s build -l ${PORT:-3000}"]
