@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Literal, Optional
 from cryptography.fernet import Fernet, InvalidToken
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -23,11 +23,18 @@ from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr, Field
 from starlette.middleware.cors import CORSMiddleware
 
+import cloudinary
+import cloudinary.uploader
+
 
 ROOT_DIR = Path(__file__).parent
-UPLOAD_DIR = ROOT_DIR / "storage"
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 load_dotenv(ROOT_DIR / ".env")
+
+cloudinary.config(
+    cloud_name=os.environ["CLOUDINARY_CLOUD_NAME"],
+    api_key=os.environ["CLOUDINARY_API_KEY"],
+    api_secret=os.environ["CLOUDINARY_API_SECRET"],
+)
 
 mongo_url = os.environ["MONGO_URL"]
 client = AsyncIOMotorClient(mongo_url)
@@ -1007,7 +1014,7 @@ async def validate_capacity_for_program(start_week: str, span_weeks: int, ignore
             raise HTTPException(status_code=400, detail=f"Week {week_start} is full for the selected program.")
 
 
-async def save_upload(upload: UploadFile, directory: Path, prefix: str) -> Dict[str, Any]:
+async def save_upload(upload: UploadFile, folder: str, prefix: str) -> Dict[str, Any]:
     suffix = Path(upload.filename or "").suffix.lower()
     if suffix not in ALLOWED_UPLOAD_EXTENSIONS:
         raise HTTPException(status_code=400, detail="Only PDF and image files are allowed.")
@@ -1037,13 +1044,20 @@ async def save_upload(upload: UploadFile, directory: Path, prefix: str) -> Dict[
         except Exception:
             logger.exception("HEIC conversion failed for %s, storing original", upload.filename)
 
-    stored_name = f"{prefix}-{uuid.uuid4().hex}{suffix}"
-    path = directory / stored_name
-    path.write_bytes(content)
+    stored_name = f"{prefix}-{uuid.uuid4().hex}"
+    result = await asyncio.to_thread(
+        cloudinary.uploader.upload,
+        content,
+        folder=f"pawstraining/{folder}",
+        public_id=stored_name,
+        resource_type="auto",
+        use_filename=False,
+        unique_filename=False,
+    )
     return {
         "original_name": upload.filename,
         "stored_name": stored_name,
-        "path": str(path),
+        "cloudinary_url": result["secure_url"],
         "content_type": content_type,
         "size": len(content),
     }
@@ -1258,9 +1272,7 @@ async def upload_final_payment_via_token(token: str, file: UploadFile = File(...
         raise HTTPException(status_code=400, detail="Final payment proof has already been uploaded.")
     if booking.get("payment_status") != "Verified":
         raise HTTPException(status_code=400, detail="Deposit must be verified before uploading final payment.")
-    booking_dir = UPLOAD_DIR / booking["id"]
-    booking_dir.mkdir(parents=True, exist_ok=True)
-    file_info = await save_upload(file, booking_dir, "final-payment-proof")
+    file_info = await save_upload(file, booking["id"], "final-payment-proof")
     await db.bookings.update_one(
         {"id": booking["id"]},
         {"$set": {"final_payment_proof": file_info, "updated_at": iso_now()}},
@@ -1569,19 +1581,27 @@ async def get_public_config() -> Dict[str, Any]:
 
 
 @api_router.get("/public/assets/logo")
-async def get_logo_asset() -> FileResponse:
+async def get_logo_asset():
     settings_doc = await get_business_settings()
     logo_asset = settings_doc.get("logo_asset")
-    if not logo_asset or not Path(logo_asset).exists():
+    if not logo_asset:
+        raise HTTPException(status_code=404, detail="Logo not found.")
+    if isinstance(logo_asset, str) and logo_asset.startswith("http"):
+        return RedirectResponse(url=logo_asset)
+    if not Path(logo_asset).exists():
         raise HTTPException(status_code=404, detail="Logo not found.")
     return FileResponse(Path(logo_asset))
 
 
 @api_router.get("/public/assets/landing-hero")
-async def get_landing_hero_asset() -> FileResponse:
+async def get_landing_hero_asset():
     settings_doc = await get_business_settings()
     hero_asset = settings_doc.get("landing_hero_image_asset")
-    if not hero_asset or not Path(hero_asset).exists():
+    if not hero_asset:
+        raise HTTPException(status_code=404, detail="Landing hero image not found.")
+    if isinstance(hero_asset, str) and hero_asset.startswith("http"):
+        return RedirectResponse(url=hero_asset)
+    if not Path(hero_asset).exists():
         raise HTTPException(status_code=404, detail="Landing hero image not found.")
     return FileResponse(Path(hero_asset))
 
@@ -1630,10 +1650,8 @@ async def create_public_booking(
 
     booking_id = str(uuid.uuid4())
     final_payment_token = secrets.token_urlsafe(32)
-    booking_dir = UPLOAD_DIR / booking_id
-    booking_dir.mkdir(parents=True, exist_ok=True)
-    payment_file = await save_upload(payment_proof, booking_dir, "payment-proof")
-    certificate_file = await save_upload(vaccination_certificate, booking_dir, "vaccination-certificate")
+    payment_file = await save_upload(payment_proof, booking_id, "payment-proof")
+    certificate_file = await save_upload(vaccination_certificate, booking_id, "vaccination-certificate")
     now = iso_now()
     booking_doc = {
         "id": booking_id,
@@ -1966,24 +1984,20 @@ async def update_settings(payload: SettingsUpdate, _: Dict[str, Any] = Depends(r
 
 @api_router.post("/admin/settings/logo")
 async def upload_logo(file: UploadFile = File(...), _: Dict[str, Any] = Depends(require_role("superadmin"))) -> Dict[str, str]:
-    branding_dir = UPLOAD_DIR / "branding"
-    branding_dir.mkdir(parents=True, exist_ok=True)
-    logo_asset = await save_upload(file, branding_dir, "brand-logo")
+    logo_asset = await save_upload(file, "branding", "brand-logo")
     await db.settings.update_one(
         {"id": "business-config"},
-        {"$set": {"logo_asset": logo_asset["path"], "updated_at": iso_now()}},
+        {"$set": {"logo_asset": logo_asset["cloudinary_url"], "updated_at": iso_now()}},
     )
     return {"logo_url": "/api/public/assets/logo"}
 
 
 @api_router.post("/admin/settings/landing-hero-image")
 async def upload_landing_hero_image(file: UploadFile = File(...), _: Dict[str, Any] = Depends(require_role("superadmin"))) -> Dict[str, str]:
-    branding_dir = UPLOAD_DIR / "branding"
-    branding_dir.mkdir(parents=True, exist_ok=True)
-    hero_asset = await save_upload(file, branding_dir, "landing-hero")
+    hero_asset = await save_upload(file, "branding", "landing-hero")
     await db.settings.update_one(
         {"id": "business-config"},
-        {"$set": {"landing_hero_image_asset": hero_asset["path"], "updated_at": iso_now()}},
+        {"$set": {"landing_hero_image_asset": hero_asset["cloudinary_url"], "updated_at": iso_now()}},
     )
     return {"landing_hero_image_url": "/api/public/assets/landing-hero"}
 
@@ -1994,14 +2008,19 @@ async def get_email_logs(_: Dict[str, Any] = Depends(require_role("superadmin", 
 
 
 @api_router.get("/admin/documents/{booking_id}/{document_type}")
-async def get_document(booking_id: str, document_type: str, _: Dict[str, Any] = Depends(get_current_admin)) -> FileResponse:
+async def get_document(booking_id: str, document_type: str, _: Dict[str, Any] = Depends(get_current_admin)):
     if document_type not in {"payment_proof", "vaccination_certificate", "final_payment_proof"}:
         raise HTTPException(status_code=400, detail="Invalid document type.")
     booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found.")
     document = booking.get(document_type)
-    if not document or not document.get("path") or not Path(document["path"]).exists():
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not available.")
+    cloudinary_url = document.get("cloudinary_url")
+    if cloudinary_url:
+        return RedirectResponse(url=cloudinary_url)
+    if not document.get("path") or not Path(document["path"]).exists():
         raise HTTPException(status_code=404, detail="Document not available.")
     file_path = Path(document["path"])
     media_type = document.get("content_type")
@@ -2016,9 +2035,7 @@ async def upload_final_payment_proof(booking_id: str, file: UploadFile = File(..
     booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found.")
-    booking_dir = UPLOAD_DIR / booking_id
-    booking_dir.mkdir(parents=True, exist_ok=True)
-    file_info = await save_upload(file, booking_dir, "final-payment-proof")
+    file_info = await save_upload(file, booking_id, "final-payment-proof")
     await db.bookings.update_one(
         {"id": booking_id},
         {"$set": {"final_payment_proof": file_info, "updated_at": iso_now()}},
