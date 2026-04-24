@@ -70,6 +70,8 @@ REACT_APP_BACKEND_URL=https://packmanager-production-dfd2.up.railway.app
 | Task 6 | Pin bcrypt to 4.0.1 to fix passlib warning | `0afbdde` |
 | Deploy frontend | Railway config (`frontend/railway.json`), service created and deployed | `58b9885` |
 | Task 4 frontend | Pagination support in BookingsView — reads `{bookings, total, page, total_pages}` from API, shows prev/next controls | `(latest)` |
+| Frontend build fix | Switch to Dockerfile builder, fix CRA/Node20 ajv conflicts, disable ESLint plugin, stub ForkTsChecker, pin serve@13 | `b78466f` |
+| Backend Cloudinary fix | Add missing CLOUDINARY_* env vars to Railway backend service (were causing CRASHED state) | `2026-04-24` |
 
 ## API shape — GET /api/admin/bookings
 
@@ -89,10 +91,11 @@ Query params accepted: `status_filter`, `program_id`, `week_start`, `search`, `p
 ## Deployment workflow
 
 - Every `git push` to `main` triggers auto-deploy on Railway for both services.
+- **Important:** Auto-deploy from git push is unreliable — use `latestCommit: true` in the API call to force the latest commit.
 - To force a manual deploy via API:
   ```bash
   curl -s -X POST https://backboard.railway.app/graphql/v2 \
     -H "Authorization: Bearer 40aae0e3-a193-4a4e-afbb-85487b0f6dcc" \
     -H "Content-Type: application/json" \
-    -d '{"query": "mutation { serviceInstanceDeploy(serviceId: \"<SERVICE_ID>\", environmentId: \"cea78451-6128-43cb-b7e7-fe319c3ba63c\") }"}'
+    -d '{"query": "mutation { serviceInstanceDeploy(serviceId: \"<SERVICE_ID>\", environmentId: \"cea78451-6128-43cb-b7e7-fe319c3ba63c\", latestCommit: true) }"}'
   ```
