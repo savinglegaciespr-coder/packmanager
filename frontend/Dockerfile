@@ -14,7 +14,10 @@ RUN npm install --legacy-peer-deps && \
     rm -rf /app/node_modules/fork-ts-checker-webpack-plugin/node_modules/ajv-keywords \
            /app/node_modules/fork-ts-checker-webpack-plugin/node_modules/schema-utils && \
     printf 'module.exports = class {};\n' > /app/node_modules/react-dev-utils/ForkTsCheckerWebpackPlugin.js && \
-    printf 'module.exports = class {};\n' > /app/node_modules/react-dev-utils/ForkTsCheckerWarningsWebpackPlugin.js
+    printf 'module.exports = class {};\n' > /app/node_modules/react-dev-utils/ForkTsCheckerWarningsWebpackPlugin.js && \
+    mkdir -p /app/node_modules/ajv-keywords/node_modules && \
+    ln -sfn /app/node_modules/schema-utils/node_modules/ajv \
+            /app/node_modules/ajv-keywords/node_modules/ajv
 
 COPY . .
 RUN npm run build
