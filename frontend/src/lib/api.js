@@ -100,9 +100,9 @@ export const adminApi = {
       return normalizeError(error);
     }
   },
-  async getBookings(token) {
+  async getBookings(token, params = {}) {
     try {
-      const response = await client.get("/admin/bookings", authConfig(token));
+      const response = await client.get("/admin/bookings", { ...authConfig(token), params });
       return response.data;
     } catch (error) {
       return normalizeError(error);

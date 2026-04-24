@@ -1703,7 +1703,7 @@ const DashboardView = ({ dashboard, language, currencyCode }) => {
   );
 };
 
-const BookingsView = ({ bookings, programs, token, language, onUpdateBooking, onFinalPaymentUpload, onManualCreate, currencyCode, capacityWeeks, adminRole }) => {
+const BookingsView = ({ bookings, bookingsMeta = { total: 0, total_pages: 1, page: 1 }, programs, token, language, onUpdateBooking, onFinalPaymentUpload, onManualCreate, onPageChange, currencyCode, capacityWeeks, adminRole }) => {
   const t = translations[language];
   const isOp = adminRole === "operator";
   const [filters, setFilters] = useState({ status: "all", programId: "all", weekStart: "all", search: "" });
@@ -1734,7 +1734,10 @@ const BookingsView = ({ bookings, programs, token, language, onUpdateBooking, on
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <CardTitle className="text-white">{t.bookings}</CardTitle>
-              <CardDescription className="text-zinc-400">{filteredBookings.length} {language === "es" ? "reservas visibles" : "visible bookings"}</CardDescription>
+              <CardDescription className="text-zinc-400">
+                {filteredBookings.length} {language === "es" ? "visibles" : "visible"}
+                {bookingsMeta.total > 0 && ` · ${bookingsMeta.total} ${language === "es" ? "total" : "total"}`}
+              </CardDescription>
             </div>
             {onManualCreate && (
               <Button className="touch-button rounded-full bg-primary text-white hover:bg-red-700" data-testid="open-manual-booking-button" onClick={() => setManualOpen(true)} type="button">
@@ -1794,6 +1797,37 @@ const BookingsView = ({ bookings, programs, token, language, onUpdateBooking, on
               </tbody>
             </table>
           </div>
+          {bookingsMeta.total_pages > 1 && (
+            <div className="flex items-center justify-between border-t border-white/10 pt-4">
+              <span className="text-sm text-zinc-400">
+                {language === "es"
+                  ? `${bookingsMeta.total} reservas · página ${bookingsMeta.page} de ${bookingsMeta.total_pages}`
+                  : `${bookingsMeta.total} bookings · page ${bookingsMeta.page} of ${bookingsMeta.total_pages}`}
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  className="rounded-full border border-white/10 bg-white/5 text-white hover:bg-white/10"
+                  disabled={bookingsMeta.page <= 1}
+                  onClick={() => onPageChange(bookingsMeta.page - 1)}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  {language === "es" ? "Anterior" : "Previous"}
+                </Button>
+                <Button
+                  className="rounded-full border border-white/10 bg-white/5 text-white hover:bg-white/10"
+                  disabled={bookingsMeta.page >= bookingsMeta.total_pages}
+                  onClick={() => onPageChange(bookingsMeta.page + 1)}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  {language === "es" ? "Siguiente" : "Next"}
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
       <BookingDetailDialog adminRole={adminRole} booking={selectedBooking} currencyCode={currencyCode} language={language} onClose={() => setSelectedBooking(null)} onFinalPaymentUpload={onFinalPaymentUpload} onSave={onUpdateBooking} token={token} />
@@ -2372,6 +2406,8 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
   const navigate = useNavigate();
   const [dashboard, setDashboard] = useState(null);
   const [bookings, setBookings] = useState([]);
+  const [bookingsPage, setBookingsPage] = useState(1);
+  const [bookingsMeta, setBookingsMeta] = useState({ total: 0, total_pages: 1, page: 1 });
   const [programs, setPrograms] = useState([]);
   const [capacityWeeks, setCapacityWeeks] = useState([]);
   const [settings, setSettings] = useState(null);
@@ -2391,8 +2427,9 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
       setLoading(true);
     }
     try {
-      const bookingsResponse = await adminApi.getBookings(session.token);
-      setBookings(bookingsResponse);
+      const bookingsResponse = await adminApi.getBookings(session.token, { page: bookingsPage, limit: 20 });
+      setBookings(bookingsResponse.bookings || []);
+      setBookingsMeta({ total: bookingsResponse.total || 0, total_pages: bookingsResponse.total_pages || 1, page: bookingsResponse.page || 1 });
 
       if (!isOperator) {
         const [dashboardResponse, programsResponse, capacityResponse] = await Promise.all([
@@ -2424,7 +2461,7 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
         setLoading(false);
       }
     }
-  }, [adminRole, isOperator, language, navigate, onLogout, session.token]);
+  }, [adminRole, bookingsPage, isOperator, language, navigate, onLogout, session.token]);
 
   useEffect(() => {
     if (location.pathname === "/admin") {
@@ -2651,10 +2688,12 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
                 <BookingsView
                   adminRole={adminRole}
                   bookings={bookings}
+                  bookingsMeta={bookingsMeta}
                   capacityWeeks={capacityWeeks}
                   currencyCode={config?.currency || "USD"}
                   language={language}
                   onManualCreate={isSuperadminOrAdmin ? createManualBooking : null}
+                  onPageChange={setBookingsPage}
                   onUpdateBooking={saveBooking}
                   onFinalPaymentUpload={isSuperadminOrAdmin ? uploadFinalPaymentProof : null}
                   programs={programs}
