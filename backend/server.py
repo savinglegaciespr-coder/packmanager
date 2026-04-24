@@ -1015,6 +1015,9 @@ async def save_upload(upload: UploadFile, directory: Path, prefix: str) -> Dict[
     if not content:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File too large. Maximum size is 10MB.")
+
     content_type = upload.content_type or "application/octet-stream"
 
     # Convert HEIC/HEIF to JPEG for browser compatibility
