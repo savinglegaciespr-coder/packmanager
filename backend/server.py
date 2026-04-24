@@ -1406,6 +1406,12 @@ async def build_dashboard_payload() -> Dict[str, Any]:
 
 @app.on_event("startup")
 async def startup_event() -> None:
+    await db.bookings.create_index("id", background=True)
+    await db.bookings.create_index("status", background=True)
+    await db.bookings.create_index("program_id", background=True)
+    await db.bookings.create_index("reservation_expires_at", background=True)
+    await db.admins.create_index("email", background=True)
+    await db.programs.create_index("id", background=True)
     await ensure_seed_data()
     await expire_stale_bookings()
 
