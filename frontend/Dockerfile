@@ -21,4 +21,4 @@ RUN npm run build
 
 RUN npm install -g serve@13
 
-CMD ["sh", "-c", "serve -s /app/build -l ${PORT:-3000}"]
+CMD ["sh", "-c", "P=${PORT:-3000}; [ \"$P\" = \"null\" ] && P=3000; serve -s /app/build -l $P"]
