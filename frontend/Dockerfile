@@ -18,6 +18,7 @@ RUN npm install --legacy-peer-deps && \
 
 COPY . .
 RUN npm run build
+RUN ls -la /app/build/ && echo "--- index.html check ---" && cat /app/build/index.html | head -3 || echo "NO index.html found"
 
 RUN npm install -g serve@13
 
