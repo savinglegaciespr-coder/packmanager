@@ -1484,15 +1484,6 @@ def require_role(*allowed_roles: str):
     return _check
 
 
-@api_router.get("/admin/db-stats")
-async def db_stats(admin: Dict[str, Any] = Depends(require_role("superadmin", "admin"))) -> Dict[str, Any]:
-    names = await db.list_collection_names()
-    result = {}
-    for name in sorted(names):
-        result[name] = await db[name].count_documents({})
-    return {"database": os.environ["DB_NAME"], "collections": result}
-
-
 @api_router.get("/admin/users")
 async def list_users(admin: Dict[str, Any] = Depends(require_role("superadmin", "admin"))) -> List[Dict[str, Any]]:
     role = admin.get("role", "operator")
