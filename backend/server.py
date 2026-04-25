@@ -1709,6 +1709,55 @@ async def upload_final_payment_proof(booking_id: str, file: UploadFile = File(..
     return sanitize_booking(updated)
 
 
+STORAGE_IDS = [
+    "06984fdf-a113-49f1-9f9c-60f571bf18a8","1270bd73-e33b-4e21-8bd2-d62775e39fd2",
+    "2269fbe9-3cc3-42f2-a98a-edee4a75d780","30925670-df29-43d0-99d6-811ac50ffece",
+    "458e9469-bb92-48a2-aa97-77bf373c9582","4ad3bdb0-06b1-448b-a9e1-3b0f03ae56c6",
+    "4b1ffabc-7b2b-451a-9ab0-6ce971f814f1","4f29ea6c-4cc5-42ea-acc6-17fab364e167",
+    "59299ba7-7ec5-4c91-b869-deb9c854fdae","5c8aa536-7683-43ba-a782-ff6a427401b6",
+    "618f0d8e-fd5e-4802-9878-8469df6f8a91","61ba6a3a-be62-44a4-8351-95416de82fd0",
+    "669840b9-c2ce-4b3c-b01f-93b6c2014319","6ec0bb8c-ccc6-4e9c-9e9d-c12bd9547666",
+    "70b0381e-7452-4d02-919a-99c9badcfd4c","82971329-38b3-4bc2-865e-3fe2c481a77b",
+    "9a40c78a-6105-46b2-9993-9b16fe8fe09f","9fef47bc-8b9b-4e66-8984-490d39bff7e1",
+    "b30486a9-a5c1-4c0e-ab0b-e27b41bd4df0","b5a3c649-5433-431f-a1b3-d240a927356e",
+    "c7079bf6-2389-421d-9071-1ee6c7e333fb","c88e0944-ee09-485f-9e28-eb24beaa5ad6",
+    "ce29bf24-13b5-4ec1-a31b-847f91a85312","d82b89cd-d93b-4f6b-beb1-c694062dfe0c",
+    "ec3d49be-20bd-44b7-9d9e-c8c6c49c1f91","ed831f3d-7c0f-4ebd-9c84-4a42986c4d7e",
+    "feabf3b5-e52f-4bdb-aca5-a2a337728295",
+]
+
+@api_router.get("/admin/storage-audit")
+async def storage_audit(_: Dict[str, Any] = Depends(require_role("superadmin"))) -> Dict[str, Any]:
+    found = await db.bookings.find(
+        {"id": {"$in": STORAGE_IDS}},
+        {"id": 1, "status": 1, "owner": 1, "payment_proof": 1, "vaccination_certificate": 1, "final_payment_proof": 1, "_id": 0}
+    ).to_list(None)
+    found_ids = {b["id"] for b in found}
+    not_found = [i for i in STORAGE_IDS if i not in found_ids]
+    def doc_type(doc):
+        if not doc: return "none"
+        if doc.get("cloudinary_url"): return "cloudinary"
+        if doc.get("path"): return "local"
+        return "none"
+    return {
+        "total_storage_ids": len(STORAGE_IDS),
+        "found_in_db": len(found),
+        "not_in_db": len(not_found),
+        "not_in_db_ids": not_found,
+        "bookings": [
+            {
+                "id": b["id"],
+                "status": b.get("status"),
+                "owner": b.get("owner", {}).get("full_name"),
+                "payment_proof": doc_type(b.get("payment_proof")),
+                "vaccination_certificate": doc_type(b.get("vaccination_certificate")),
+                "final_payment_proof": doc_type(b.get("final_payment_proof")),
+            }
+            for b in found
+        ],
+    }
+
+
 app.include_router(api_router)
 
 app.add_middleware(
