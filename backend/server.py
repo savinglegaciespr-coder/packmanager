@@ -29,6 +29,8 @@ from slowapi.util import get_remote_address
 import cloudinary
 import cloudinary.uploader
 
+from utils.notifications import send_telegram_message
+
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -80,6 +82,14 @@ limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="PAWS TRAINING API")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    await send_telegram_message(f"❌ Error: {exc}")
+    raise exc
+
+
 api_router = APIRouter(prefix="/api")
 
 
@@ -1089,6 +1099,8 @@ async def startup_event() -> None:
     await db.programs.create_index("id", background=True)
     await ensure_seed_data()
     await expire_stale_bookings()
+    await send_telegram_message("🚀 Backend started successfully")
+    await send_telegram_message("✅ Deployment completed")
 
 
 @app.on_event("shutdown")
