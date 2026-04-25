@@ -283,6 +283,9 @@
     aspect-ratio: 4 / 3;
     overflow: hidden;
     border-radius: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .media-frame img {
@@ -290,6 +293,7 @@
     height: 100%;
     object-fit: cover;
     object-position: center;
+    display: block;
 }
 
 @keyframes revealUp {
