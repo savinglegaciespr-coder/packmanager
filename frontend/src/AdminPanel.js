@@ -52,7 +52,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { adminApi, openProtectedDocument } from "@/lib/api";
+import { adminApi, clearAdminCache, openProtectedDocument } from "@/lib/api";
 import { translations } from "@/lib/translations";
 import {
   CHART_COLORS,
@@ -71,6 +71,67 @@ import {
   shiftIsoDateByWeeks,
 } from "@/lib/sharedUtils";
 import { AppFooter, BrandMark, LanguageToggle, MeasuredChart, PublicHeader } from "@/components/SharedComponents";
+
+const Sk = ({ className = "" }) => (
+  <div className={`animate-pulse rounded-xl bg-white/10 ${className}`} />
+);
+
+const DashboardSkeleton = () => (
+  <div className="grid gap-6" data-testid="dashboard-skeleton">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {[...Array(4)].map((_, i) => <Sk className="h-36 rounded-[1.75rem]" key={i} />)}
+    </div>
+    <div className="grid gap-6 lg:grid-cols-2">
+      <Sk className="h-72 rounded-[1.75rem]" />
+      <Sk className="h-72 rounded-[1.75rem]" />
+    </div>
+  </div>
+);
+
+const TableSkeleton = () => (
+  <div className="grid gap-4" data-testid="table-skeleton">
+    <Sk className="h-14 rounded-[1.75rem]" />
+    {[...Array(5)].map((_, i) => <Sk className="h-16 rounded-2xl" key={i} />)}
+  </div>
+);
+
+const TwoColFormSkeleton = () => (
+  <div className="grid gap-6 lg:grid-cols-2" data-testid="form-skeleton">
+    <div className="grid gap-4">
+      {[...Array(3)].map((_, i) => <Sk className="h-28 rounded-[1.75rem]" key={i} />)}
+    </div>
+    <Sk className="h-96 rounded-[1.75rem]" />
+  </div>
+);
+
+const CapacitySkeleton = () => (
+  <div className="grid gap-4" data-testid="capacity-skeleton">
+    {[...Array(6)].map((_, i) => <Sk className="h-20 rounded-2xl" key={i} />)}
+  </div>
+);
+
+const WeeklyOpsSkeleton = () => (
+  <div className="grid gap-4" data-testid="weekly-ops-skeleton">
+    {[...Array(4)].map((_, i) => <Sk className="h-40 rounded-[1.75rem]" key={i} />)}
+  </div>
+);
+
+const OperationsScreenSkeleton = () => (
+  <div className="grid gap-6" data-testid="ops-screen-skeleton">
+    <Sk className="h-36 rounded-[2rem]" />
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      {[...Array(5)].map((_, i) => <Sk className="h-48 rounded-[2rem]" key={i} />)}
+    </div>
+    <Sk className="h-96 rounded-[2rem]" />
+  </div>
+);
+
+const UsersSkeleton = () => (
+  <div className="grid gap-4" data-testid="users-skeleton">
+    <Sk className="h-16 rounded-[2rem]" />
+    {[...Array(3)].map((_, i) => <Sk className="h-12 rounded-xl" key={i} />)}
+  </div>
+);
 
 export const AdminLoginPage = ({ config, language, setLanguage, onLogin, showAdminAccess }) => {
   const t = translations[language];
@@ -1386,6 +1447,7 @@ export const AdminShell = ({ language, setLanguage, session, setSession, onLogou
   const [settings, setSettings] = useState(null);
   const [emailLogs, setEmailLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const hasInitialDataRef = useRef(false);
   const [lastUpdated, setLastUpdated] = useState(() => new Date().toLocaleTimeString(language === "es" ? "es-ES" : "en-US"));
   const [pwOpen, setPwOpen] = useState(false);
   const [pwForm, setPwForm] = useState({ current: "", next: "", confirm: "", email: "" });
@@ -1398,8 +1460,9 @@ export const AdminShell = ({ language, setLanguage, session, setSession, onLogou
     bookingsPageRef.current = bookingsPage;
   }, [bookingsPage]);
 
-  const refreshAll = useCallback(async (showLoader = true) => {
-    if (showLoader) setLoading(true);
+  const refreshAll = useCallback(async () => {
+    const isFirst = !hasInitialDataRef.current;
+    if (isFirst) setLoading(true);
     try {
       const bookingsResponse = await adminApi.getBookings(session.token, { page: bookingsPageRef.current, limit: 20 });
       setBookings(bookingsResponse.bookings || []);
@@ -1425,13 +1488,14 @@ export const AdminShell = ({ language, setLanguage, session, setSession, onLogou
         setEmailLogs(emailLogsResponse);
       }
 
+      hasInitialDataRef.current = true;
       setLastUpdated(new Date().toLocaleTimeString(language === "es" ? "es-ES" : "en-US"));
     } catch (error) {
       toast.error(error.message);
       onLogout();
       navigate("/admin/login");
     } finally {
-      if (showLoader) setLoading(false);
+      if (isFirst) setLoading(false);
     }
   }, [adminRole, isOperator, language, navigate, onLogout, session.token]);
 
@@ -1455,9 +1519,21 @@ export const AdminShell = ({ language, setLanguage, session, setSession, onLogou
     fetchBookingsPage(newPage);
   }, [fetchBookingsPage]);
 
+  const prefetchSection = useCallback((key) => {
+    if (key === "dashboard" && !isOperator) adminApi.getDashboard(session.token).catch(() => {});
+    if (key === "bookings") adminApi.getBookings(session.token, { page: bookingsPageRef.current, limit: 20 }).catch(() => {});
+    if (key === "programs" && !isOperator) adminApi.getPrograms(session.token).catch(() => {});
+    if (key === "capacity" && !isOperator) adminApi.getCapacity(session.token).catch(() => {});
+    if (key === "settings") adminApi.getSettings(session.token).catch(() => {});
+    if (key === "operations-screen" || key === "weekly-operations") {
+      adminApi.getBookings(session.token, { page: 1, limit: 20 }).catch(() => {});
+      if (!isOperator) adminApi.getCapacity(session.token).catch(() => {});
+    }
+  }, [isOperator, session.token]);
+
   useEffect(() => {
     if (currentSection !== "operations-screen") return undefined;
-    const intervalId = window.setInterval(() => { refreshAll(false); }, 30000);
+    const intervalId = window.setInterval(() => { clearAdminCache(); refreshAll(); }, 30000);
     return () => window.clearInterval(intervalId);
   }, [currentSection, refreshAll]);
 
@@ -1575,7 +1651,7 @@ export const AdminShell = ({ language, setLanguage, session, setSession, onLogou
             {navigationItems.map((item) => {
               const Icon = item.icon;
               return (
-                <NavLink className={({ isActive }) => `sidebar-link ${isActive ? "active" : ""}`} data-testid={`admin-nav-${item.key}`} key={item.key} to={`/admin/${item.key}`}>
+                <NavLink className={({ isActive }) => `sidebar-link ${isActive ? "active" : ""}`} data-testid={`admin-nav-${item.key}`} key={item.key} onMouseEnter={() => prefetchSection(item.key)} to={`/admin/${item.key}`}>
                   <Icon className="h-4 w-4" />
                   <span>{item.label}</span>
                 </NavLink>
@@ -1645,7 +1721,19 @@ export const AdminShell = ({ language, setLanguage, session, setSession, onLogou
             </div>
           </header>
           {loading ? (
-            <Card className="surface-panel rounded-[2rem] border-white/10 p-10 text-center text-zinc-400">{t.loadingAdmin}</Card>
+            <>
+              {(currentSection === "dashboard") && <DashboardSkeleton />}
+              {(currentSection === "bookings") && <TableSkeleton />}
+              {(currentSection === "programs") && <TwoColFormSkeleton />}
+              {(currentSection === "capacity") && <CapacitySkeleton />}
+              {(currentSection === "weekly-operations") && <WeeklyOpsSkeleton />}
+              {(currentSection === "operations-screen") && <OperationsScreenSkeleton />}
+              {(currentSection === "settings") && <TwoColFormSkeleton />}
+              {(currentSection === "users") && <UsersSkeleton />}
+              {!["dashboard","bookings","programs","capacity","weekly-operations","operations-screen","settings","users"].includes(currentSection) && (
+                <Card className="surface-panel rounded-[2rem] border-white/10 p-10 text-center text-zinc-400">{t.loadingAdmin}</Card>
+              )}
+            </>
           ) : (
             <>
               {currentSection === "dashboard" && isSuperadminOrAdmin && <DashboardView currencyCode={config?.currency || "USD"} dashboard={dashboard} language={language} />}

@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Toaster } from "@/components/ui/sonner";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { adminApi, publicApi } from "@/lib/api";
+import { adminApi, clearAdminCache, publicApi } from "@/lib/api";
 import { translations } from "@/lib/translations";
 import {
   normalizeLandingContent,
@@ -688,6 +688,7 @@ const AppRoutes = ({ publicState, session, setSession, language, setLanguage, re
   const handleLogout = () => {
     setSession(null);
     localStorage.removeItem("paws-admin-session");
+    clearAdminCache();
   };
 
   return (

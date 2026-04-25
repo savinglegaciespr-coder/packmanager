@@ -18,6 +18,25 @@ const withCache = async (key, ttlMs, fetcher) => {
 };
 export const invalidateCache = (key) => cache.delete(key);
 
+const adminCache = new Map();
+const ADMIN_TTL = 30_000;
+
+const withAdminCache = async (key, fetcher) => {
+  const cached = adminCache.get(key);
+  if (cached && Date.now() - cached.ts < ADMIN_TTL) return cached.data;
+  const data = await fetcher();
+  adminCache.set(key, { data, ts: Date.now() });
+  return data;
+};
+
+export const clearAdminCache = () => adminCache.clear();
+
+const bustAdminPrefix = (prefix) => {
+  for (const key of adminCache.keys()) {
+    if (key.startsWith(prefix)) adminCache.delete(key);
+  }
+};
+
 const authConfig = (token) => ({
   headers: {
     Authorization: `Bearer ${token}`,
@@ -107,24 +126,31 @@ export const adminApi = {
     }
   },
   async getDashboard(token) {
-    try {
-      const response = await client.get("/admin/dashboard", authConfig(token));
-      return response.data;
-    } catch (error) {
-      return normalizeError(error);
-    }
+    return withAdminCache("admin:dashboard", async () => {
+      try {
+        const response = await client.get("/admin/dashboard", authConfig(token));
+        return response.data;
+      } catch (error) {
+        return normalizeError(error);
+      }
+    });
   },
   async getBookings(token, params = {}) {
-    try {
-      const response = await client.get("/admin/bookings", { ...authConfig(token), params });
-      return response.data;
-    } catch (error) {
-      return normalizeError(error);
-    }
+    const page = params.page || 1;
+    return withAdminCache(`admin:bookings:p${page}`, async () => {
+      try {
+        const response = await client.get("/admin/bookings", { ...authConfig(token), params });
+        return response.data;
+      } catch (error) {
+        return normalizeError(error);
+      }
+    });
   },
   async updateBooking(token, bookingId, payload) {
     try {
       const response = await client.patch(`/admin/bookings/${bookingId}`, payload, authConfig(token));
+      bustAdminPrefix("admin:bookings:");
+      adminCache.delete("admin:dashboard");
       return response.data;
     } catch (error) {
       return normalizeError(error);
@@ -133,23 +159,29 @@ export const adminApi = {
   async createManualBooking(token, payload) {
     try {
       const response = await client.post("/admin/bookings/manual", payload, authConfig(token));
+      bustAdminPrefix("admin:bookings:");
+      adminCache.delete("admin:dashboard");
       return response.data;
     } catch (error) {
       return normalizeError(error);
     }
   },
   async getPrograms(token) {
-    try {
-      const response = await client.get("/admin/programs", authConfig(token));
-      return response.data;
-    } catch (error) {
-      return normalizeError(error);
-    }
+    return withAdminCache("admin:programs", async () => {
+      try {
+        const response = await client.get("/admin/programs", authConfig(token));
+        return response.data;
+      } catch (error) {
+        return normalizeError(error);
+      }
+    });
   },
   async createProgram(token, payload) {
     try {
       const response = await client.post("/admin/programs", payload, authConfig(token));
       invalidateCache("public:programs");
+      adminCache.delete("admin:programs");
+      adminCache.delete("admin:dashboard");
       return response.data;
     } catch (error) {
       return normalizeError(error);
@@ -159,39 +191,48 @@ export const adminApi = {
     try {
       const response = await client.put(`/admin/programs/${programId}`, payload, authConfig(token));
       invalidateCache("public:programs");
+      adminCache.delete("admin:programs");
+      adminCache.delete("admin:dashboard");
       return response.data;
     } catch (error) {
       return normalizeError(error);
     }
   },
   async getCapacity(token) {
-    try {
-      const response = await client.get("/admin/capacity", authConfig(token));
-      return response.data;
-    } catch (error) {
-      return normalizeError(error);
-    }
+    return withAdminCache("admin:capacity", async () => {
+      try {
+        const response = await client.get("/admin/capacity", authConfig(token));
+        return response.data;
+      } catch (error) {
+        return normalizeError(error);
+      }
+    });
   },
   async updateCapacity(token, weekStart, capacity) {
     try {
       const response = await client.put(`/admin/capacity/${weekStart}`, { capacity }, authConfig(token));
+      adminCache.delete("admin:capacity");
+      adminCache.delete("admin:dashboard");
       return response.data;
     } catch (error) {
       return normalizeError(error);
     }
   },
   async getSettings(token) {
-    try {
-      const response = await client.get("/admin/settings", authConfig(token));
-      return response.data;
-    } catch (error) {
-      return normalizeError(error);
-    }
+    return withAdminCache("admin:settings", async () => {
+      try {
+        const response = await client.get("/admin/settings", authConfig(token));
+        return response.data;
+      } catch (error) {
+        return normalizeError(error);
+      }
+    });
   },
   async updateSettings(token, payload) {
     try {
       const response = await client.put("/admin/settings", payload, authConfig(token));
       invalidateCache("public:config");
+      adminCache.delete("admin:settings");
       return response.data;
     } catch (error) {
       return normalizeError(error);
@@ -208,6 +249,7 @@ export const adminApi = {
           "Content-Type": "multipart/form-data",
         },
       });
+      adminCache.delete("admin:settings");
       return response.data;
     } catch (error) {
       return normalizeError(error);
@@ -224,18 +266,21 @@ export const adminApi = {
           "Content-Type": "multipart/form-data",
         },
       });
+      adminCache.delete("admin:settings");
       return response.data;
     } catch (error) {
       return normalizeError(error);
     }
   },
   async getEmailLogs(token) {
-    try {
-      const response = await client.get("/admin/email-logs", authConfig(token));
-      return response.data;
-    } catch (error) {
-      return normalizeError(error);
-    }
+    return withAdminCache("admin:emails", async () => {
+      try {
+        const response = await client.get("/admin/email-logs", authConfig(token));
+        return response.data;
+      } catch (error) {
+        return normalizeError(error);
+      }
+    });
   },
   async uploadFinalPaymentProof(token, bookingId, file) {
     const formData = new FormData();
@@ -248,6 +293,7 @@ export const adminApi = {
           "Content-Type": "multipart/form-data",
         },
       });
+      bustAdminPrefix("admin:bookings:");
       return response.data;
     } catch (error) {
       return normalizeError(error);
