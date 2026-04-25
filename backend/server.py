@@ -1141,13 +1141,6 @@ def require_role(*allowed_roles: str):
     return _check
 
 
-@api_router.delete("/admin/purge-collections")
-async def purge_collections(admin: Dict[str, Any] = Depends(require_role("superadmin", "admin"))) -> Dict[str, Any]:
-    r_bookings = await db.bookings.delete_many({})
-    r_email_logs = await db.email_logs.delete_many({})
-    return {"bookings_deleted": r_bookings.deleted_count, "email_logs_deleted": r_email_logs.deleted_count}
-
-
 @api_router.get("/admin/users")
 async def list_users(admin: Dict[str, Any] = Depends(require_role("superadmin", "admin"))) -> List[Dict[str, Any]]:
     role = admin.get("role", "operator")
