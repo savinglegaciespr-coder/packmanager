@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Literal, Optional
 from cryptography.fernet import Fernet, InvalidToken
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, status
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import RedirectResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -1248,26 +1248,18 @@ async def get_public_config() -> Dict[str, Any]:
 async def get_logo_asset():
     settings_doc = await get_business_settings()
     logo_asset = settings_doc.get("logo_asset")
-    if not logo_asset:
+    if not logo_asset or not isinstance(logo_asset, str) or not logo_asset.startswith("http"):
         raise HTTPException(status_code=404, detail="Logo not found.")
-    if isinstance(logo_asset, str) and logo_asset.startswith("http"):
-        return RedirectResponse(url=logo_asset)
-    if not Path(logo_asset).exists():
-        raise HTTPException(status_code=404, detail="Logo not found.")
-    return FileResponse(Path(logo_asset))
+    return RedirectResponse(url=logo_asset)
 
 
 @api_router.get("/public/assets/landing-hero")
 async def get_landing_hero_asset():
     settings_doc = await get_business_settings()
     hero_asset = settings_doc.get("landing_hero_image_asset")
-    if not hero_asset:
+    if not hero_asset or not isinstance(hero_asset, str) or not hero_asset.startswith("http"):
         raise HTTPException(status_code=404, detail="Landing hero image not found.")
-    if isinstance(hero_asset, str) and hero_asset.startswith("http"):
-        return RedirectResponse(url=hero_asset)
-    if not Path(hero_asset).exists():
-        raise HTTPException(status_code=404, detail="Landing hero image not found.")
-    return FileResponse(Path(hero_asset))
+    return RedirectResponse(url=hero_asset)
 
 
 @api_router.get("/public/programs")
@@ -1683,16 +1675,9 @@ async def get_document(booking_id: str, document_type: str, _: Dict[str, Any] = 
     if not document:
         raise HTTPException(status_code=404, detail="Document not available.")
     cloudinary_url = document.get("cloudinary_url")
-    if cloudinary_url:
-        return RedirectResponse(url=cloudinary_url)
-    if not document.get("path") or not Path(document["path"]).exists():
+    if not cloudinary_url:
         raise HTTPException(status_code=404, detail="Document not available.")
-    file_path = Path(document["path"])
-    media_type = document.get("content_type")
-    if not media_type:
-        ext = file_path.suffix.lower()
-        media_type = {".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}.get(ext, "application/octet-stream")
-    return FileResponse(file_path, media_type=media_type, filename=document.get("original_name"))
+    return RedirectResponse(url=cloudinary_url)
 
 
 @api_router.post("/admin/bookings/{booking_id}/final-payment-proof")
