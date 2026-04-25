@@ -22,6 +22,9 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr, Field
 from starlette.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 import cloudinary
 import cloudinary.uploader
@@ -73,7 +76,10 @@ bearer_scheme = HTTPBearer(auto_error=False)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
+limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="PAWS TRAINING API")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 api_router = APIRouter(prefix="/api")
 
 
@@ -1101,7 +1107,8 @@ async def root() -> Dict[str, str]:
 
 
 @api_router.post("/auth/login")
-async def login(payload: LoginRequest) -> Dict[str, Any]:
+@limiter.limit("5/minute")
+async def login(request: Request, payload: LoginRequest) -> Dict[str, Any]:
     admin = await db.admins.find_one({"email": payload.email}, {"_id": 0})
     if not admin or not pwd_context.verify(payload.password, admin["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials.")
@@ -1277,6 +1284,7 @@ async def get_public_weeks(program_id: str, count: int = 16) -> Dict[str, Any]:
 
 
 @api_router.post("/public/bookings")
+@limiter.limit("10/minute")
 async def create_public_booking(
     request: Request,
     program_id: str = Form(...),
