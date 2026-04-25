@@ -30,6 +30,7 @@ import cloudinary
 import cloudinary.uploader
 
 from utils.notifications import send_telegram_message
+from utils.telegram_bot import handle_update as handle_telegram_update, register_webhook as register_telegram_webhook
 
 
 ROOT_DIR = Path(__file__).parent
@@ -88,6 +89,14 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 async def global_exception_handler(request: Request, exc: Exception):
     await send_telegram_message(f"❌ Error: {exc}")
     raise exc
+
+
+@app.post("/telegram/webhook/{token}")
+async def telegram_webhook(token: str, request: Request):
+    if token != os.environ.get("TELEGRAM_BOT_TOKEN", ""):
+        return {"ok": False}
+    await handle_telegram_update(await request.json())
+    return {"ok": True}
 
 
 api_router = APIRouter(prefix="/api")
@@ -1099,6 +1108,7 @@ async def startup_event() -> None:
     await db.programs.create_index("id", background=True)
     await ensure_seed_data()
     await expire_stale_bookings()
+    await register_telegram_webhook()
     await send_telegram_message("🚀 Backend started successfully")
     await send_telegram_message("✅ Deployment completed")
 
