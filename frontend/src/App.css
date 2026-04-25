@@ -283,12 +283,12 @@
     aspect-ratio: 4 / 3;
     overflow: hidden;
     border-radius: 1.25rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    position: relative;
 }
 
 .media-frame img {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
