@@ -1375,7 +1375,6 @@ async def create_public_booking(
         "request_source": str(request.client.host) if request.client else "unknown",
     }
     await db.bookings.insert_one(booking_doc.copy())
-    await send_telegram_message("📥 New booking received")
     settings_doc = await get_business_settings()
     await send_submission_emails(booking_doc, settings_doc)
     return {
