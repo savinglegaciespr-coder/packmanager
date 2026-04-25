@@ -24,7 +24,7 @@
 - Environment: `production` (ID: `cea78451-6128-43cb-b7e7-fe319c3ba63c`)
 - Backend service: **packmanager** (ID: `b69effe0-0ad1-4623-be92-4943417f9681`)
 - Frontend service: **frontend** (ID: `2fb20633-d376-4a8e-b92f-176d1949d11a`)
-- API token: `40aae0e3-a193-4a4e-afbb-85487b0f6dcc`
+- API token: `<see Railway → Account Settings → Tokens>`
   - Used via Railway GraphQL API (not CLI — CLI v4 rejects non-browser tokens)
   - Endpoint: `https://backboard.railway.app/graphql/v2`
   - Auth header: `Authorization: Bearer <token>`
@@ -48,9 +48,9 @@ DEMO_ADMIN_EMAIL
 DEMO_ADMIN_PASSWORD
 DEMO_ADMIN_NAME
 CORS_ORIGINS
-CLOUDINARY_CLOUD_NAME=dyuksod2i
-CLOUDINARY_API_KEY=569632736354531
-CLOUDINARY_API_SECRET=ueJOoWr8_DDnhK1PwCJ_gAFvhxc
+CLOUDINARY_CLOUD_NAME=<see Railway>
+CLOUDINARY_API_KEY=<see Railway>
+CLOUDINARY_API_SECRET=<see Railway>
 ```
 
 ### Frontend (Railway service: frontend)
@@ -96,7 +96,7 @@ Query params accepted: `status_filter`, `program_id`, `week_start`, `search`, `p
 - To force a manual deploy via API:
   ```bash
   curl -s -X POST https://backboard.railway.app/graphql/v2 \
-    -H "Authorization: Bearer 40aae0e3-a193-4a4e-afbb-85487b0f6dcc" \
+    -H "Authorization: Bearer $RAILWAY_TOKEN" \
     -H "Content-Type: application/json" \
     -d '{"query": "mutation { serviceInstanceDeploy(serviceId: \"<SERVICE_ID>\", environmentId: \"cea78451-6128-43cb-b7e7-fe319c3ba63c\", latestCommit: true) }"}'
   ```

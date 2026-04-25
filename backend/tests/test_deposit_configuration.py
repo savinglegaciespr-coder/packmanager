@@ -18,7 +18,7 @@ def admin_token():
     """Get admin auth token"""
     response = requests.post(f"{BASE_URL}/api/auth/login", json={
         "email": "admin@pawstraining.com",
-        "password": "PawsAdmin2026!"
+        "password": os.environ.get("TEST_ADMIN_PASSWORD", "")
     })
     assert response.status_code == 200, f"Login failed: {response.text}"
     return response.json()["token"]

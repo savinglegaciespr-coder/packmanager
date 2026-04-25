@@ -24,7 +24,7 @@
   },
   "test_credentials": {
     "admin_email": "admin@pawstraining.com",
-    "admin_password": "PawsAdmin2026!"
+    "admin_password": "<see Railway env var DEMO_ADMIN_PASSWORD>"
   },
   "seed_data_creation": "Used existing seed data from previous iterations",
   "retest_needed": false,

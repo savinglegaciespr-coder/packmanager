@@ -25,7 +25,7 @@
   },
   "test_credentials": {
     "admin_email": "admin@pawstraining.com",
-    "admin_password": "PawsAdmin2026!",
+    "admin_password": "<see Railway env var DEMO_ADMIN_PASSWORD>",
     "smtp_email": "Pawstraningpr@gmail.com"
   },
   "seed_data_creation": "Created 3 test bookings via API: TEST_EmailTest_{uuid}, TEST_ApprovalTest_{uuid}, TEST_RejectionTest_{uuid} - all with prefixed names for easy cleanup",

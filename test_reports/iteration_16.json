@@ -33,13 +33,13 @@
     "backend": "100% (19/19 tests - 11 document_viewer + 8 file_upload_preview)",
     "frontend": "100% (all requested features verified)"
   },
-  "test_credentials": "Admin: admin@pawstraining.com / PawsAdmin2026!",
+  "test_credentials": "Admin: admin@pawstraining.com / <see Railway env var DEMO_ADMIN_PASSWORD>",
   "seed_data_creation": "Used existing test bookings: TEST_ImageUpload User (JPEG docs), TEST_PDFUpload User (PDF docs), seed-8 Patricia Mora (final_payment_proof only)",
   "retest_needed": false,
   "should_main_agent_self_test": false,
   "context_for_next_testing_agent": "Document viewer feature fully tested. Key test IDs: deposit-proof-preview-btn, vaccine-cert-preview-btn, final-payment-preview-btn for DocActionButtons. Modal test IDs: doc-preview-overlay, image-preview-img, pdf-preview-frame, zoom-in-btn, zoom-out-btn, fit-screen-btn, open-new-tab-btn, download-doc-btn, close-preview-button",
   "features_tested": {
-    "admin_login": "✓ Works with admin@pawstraining.com / PawsAdmin2026!",
+    "admin_login": "✓ Works with admin@pawstraining.com / <see Railway env var DEMO_ADMIN_PASSWORD>",
     "navigate_to_reservas": "✓ Sidebar navigation to Reservas (Bookings) works",
     "booking_with_documents": "✓ TEST_ImageUpload User bookings have payment_proof (JPEG) and vaccination_certificate (PDF)",
     "doc_action_buttons": "✓ Renders for deposit proof, vaccination certificate, and final payment proof",

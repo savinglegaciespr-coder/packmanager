@@ -11,7 +11,7 @@ BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
 # Test credentials
 SUPERADMIN_EMAIL = "admin@pawstraining.com"
-SUPERADMIN_PASSWORD = "PawsAdmin2026!"
+SUPERADMIN_PASSWORD = os.environ.get("TEST_ADMIN_PASSWORD", "")
 
 # Test user data
 TEST_OPERATOR_EMAIL = f"test_operator_{uuid.uuid4().hex[:8]}@test.com"

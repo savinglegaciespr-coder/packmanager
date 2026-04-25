@@ -20,7 +20,7 @@ Single-page monolith: entire frontend in `/app/frontend/src/App.js`, backend in 
 
 ## Admin Credentials
 - Email: admin@pawstraining.com
-- Password: PawsAdmin2026!
+- Password: <see Railway env var DEMO_ADMIN_PASSWORD>
 
 ## Completed Features (All Tested & Verified)
 1. Bilingual landing page (ES/EN) with configurable hero, programs, contact

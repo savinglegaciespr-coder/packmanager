@@ -18,7 +18,7 @@ class TestDashboardFinancialMetrics:
         """Get admin authentication token"""
         response = requests.post(f"{BASE_URL}/api/auth/login", json={
             "email": "admin@pawstraining.com",
-            "password": "PawsAdmin2026!"
+            "password": os.environ.get("TEST_ADMIN_PASSWORD", "")
         })
         assert response.status_code == 200, f"Login failed: {response.text}"
         return response.json()["token"]
@@ -129,7 +129,7 @@ class TestDepositVerifiedEmail:
         """Get admin authentication token"""
         response = requests.post(f"{BASE_URL}/api/auth/login", json={
             "email": "admin@pawstraining.com",
-            "password": "PawsAdmin2026!"
+            "password": os.environ.get("TEST_ADMIN_PASSWORD", "")
         })
         assert response.status_code == 200
         return response.json()["token"]
@@ -255,7 +255,7 @@ class TestBookingPaymentFields:
         """Get admin authentication token"""
         response = requests.post(f"{BASE_URL}/api/auth/login", json={
             "email": "admin@pawstraining.com",
-            "password": "PawsAdmin2026!"
+            "password": os.environ.get("TEST_ADMIN_PASSWORD", "")
         })
         assert response.status_code == 200
         return response.json()["token"]
@@ -332,7 +332,7 @@ class TestTranslationKeys:
         # Login to get dashboard data
         login_resp = requests.post(f"{BASE_URL}/api/auth/login", json={
             "email": "admin@pawstraining.com",
-            "password": "PawsAdmin2026!"
+            "password": os.environ.get("TEST_ADMIN_PASSWORD", "")
         })
         token = login_resp.json()["token"]
         

@@ -23,7 +23,7 @@
     "backend": "N/A (frontend-only testing)",
     "frontend": "100%"
   },
-  "test_credentials": "Superadmin: admin@pawstraining.com / PawsAdmin2026!",
+  "test_credentials": "Superadmin: admin@pawstraining.com / <see Railway env var DEMO_ADMIN_PASSWORD>",
   "seed_data_creation": "Created and cleaned up test users: tadmin@t.com (admin), top@t.com (operator)",
   "retest_needed": false,
   "should_main_agent_self_test": false,

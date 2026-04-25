@@ -29,7 +29,7 @@
     "backend": "100% (34/34 tests passed)",
     "frontend": "100% (all RBAC UI features verified)"
   },
-  "test_credentials": "Superadmin: admin@pawstraining.com / PawsAdmin2026!",
+  "test_credentials": "Superadmin: admin@pawstraining.com / <see Railway env var DEMO_ADMIN_PASSWORD>",
   "seed_data_creation": "Created and cleaned up test users during testing: test_admin_rbac_*, test_operator_rbac_*, test_admin_ui@test.com, test_operator_ui@test.com, test_operator_redirect@test.com, test_operator_final@test.com",
   "retest_needed": false,
   "should_main_agent_self_test": false,
