@@ -317,6 +317,22 @@
         overflow-x: auto;
         padding-bottom: 0.35rem;
         scroll-snap-type: x proximity;
+        -webkit-mask-image: linear-gradient(to right, black 80%, transparent 100%);
+        mask-image: linear-gradient(to right, black 80%, transparent 100%);
+    }
+
+    .admin-nav-grid::-webkit-scrollbar {
+        height: 3px;
+    }
+
+    .admin-nav-grid::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.04);
+        border-radius: 9999px;
+    }
+
+    .admin-nav-grid::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.18);
+        border-radius: 9999px;
     }
 
     .admin-nav-grid .sidebar-link {
@@ -387,6 +403,12 @@
         aspect-ratio: 4 / 5;
         max-width: 100%;
         min-height: unset;
+    }
+}
+
+@media (min-width: 480px) {
+    .hero-feature-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 

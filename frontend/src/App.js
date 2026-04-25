@@ -353,7 +353,7 @@ const LanguageToggle = ({ language, setLanguage }) => (
   </div>
 );
 
-const MeasuredChart = ({ children, className = "h-[320px]" }) => {
+const MeasuredChart = ({ children, className = "h-[200px] sm:h-[260px] md:h-[320px]" }) => {
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
 
@@ -751,7 +751,7 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
                 <label className="text-sm text-zinc-300">{t.selectWeek}</label>
                 {loadingWeeks && <span className="text-xs text-zinc-500">{t.loadingWeeks}</span>}
               </div>
-              <div className="rounded-[1.75rem] border border-white/10 bg-black/20 p-4 md:p-5" data-testid="reservation-calendar-panel">
+              <div className="rounded-[1.75rem] border border-white/10 bg-black/20 p-2 sm:p-4 md:p-5" data-testid="reservation-calendar-panel">
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-white">{t.reservationCalendar}</p>
@@ -765,22 +765,22 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
                 </div>
                 <div className="grid gap-4 xl:grid-cols-2">
                   {calendarMonths.map((month) => (
-                    <div className="rounded-2xl border border-white/10 bg-zinc-950/70 p-3" data-testid={`calendar-month-${month.monthDate.toISOString().slice(0, 7)}`} key={month.monthDate.toISOString()}>
+                    <div className="rounded-2xl border border-white/10 bg-zinc-950/70 p-2 sm:p-3" data-testid={`calendar-month-${month.monthDate.toISOString().slice(0, 7)}`} key={month.monthDate.toISOString()}>
                       <p className="mb-3 text-sm font-semibold capitalize text-white">{formatMonthLabel(month.monthDate, language)}</p>
-                      <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[11px] uppercase tracking-[0.16em] text-zinc-500">
+                      <div className="mb-2 grid grid-cols-7 gap-0.5 sm:gap-1 text-center text-[11px] uppercase tracking-[0.16em] text-zinc-500">
                         {t.weekdaysShort.map((day) => (
                           <span key={`${month.monthDate.toISOString()}-${day}`}>{day}</span>
                         ))}
                       </div>
-                      <div className="grid grid-cols-7 gap-1.5">
+                      <div className="grid grid-cols-7 gap-0.5 sm:gap-1.5">
                         {month.cells.map((cell) => {
                           if (!cell.isCurrentMonth) {
-                            return <div className="aspect-square rounded-xl bg-transparent" key={cell.id} />;
+                            return <div className="min-h-[44px] rounded-xl bg-transparent" key={cell.id} />;
                           }
 
                           if (!cell.week) {
                             return (
-                              <div className="flex aspect-square items-start justify-end rounded-xl border border-white/5 bg-white/[0.02] p-2 text-xs text-zinc-600" key={cell.id}>
+                              <div className="flex min-h-[44px] items-start justify-end rounded-xl border border-white/5 bg-white/[0.02] p-1.5 sm:p-2 text-xs text-zinc-600" key={cell.id}>
                                 {cell.dayNumber}
                               </div>
                             );
@@ -795,7 +795,7 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
 
                           return (
                             <button
-                              className={`flex aspect-square flex-col items-start justify-between rounded-xl border p-2 text-left transition-transform duration-200 hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-80 ${availabilityClasses} ${formState.start_week === cell.week.week_start ? "ring-2 ring-white/80" : ""}`}
+                              className={`flex min-h-[44px] flex-col items-start justify-between rounded-xl border p-1.5 sm:p-2 text-left transition-transform duration-200 hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-80 ${availabilityClasses} ${formState.start_week === cell.week.week_start ? "ring-2 ring-white/80" : ""}`}
                               data-testid={`week-card-${cell.week.week_start}`}
                               disabled={cell.week.remaining === 0}
                               key={cell.id}
@@ -1579,7 +1579,7 @@ const DashboardView = ({ dashboard, language, currencyCode }) => {
   const depositOutstanding = m.total_deposit_expected - m.total_deposit_collected;
   return (
     <div className="grid gap-6" data-testid="admin-dashboard-view">
-      <div className="grid gap-4 xl:grid-cols-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <MetricCard subtitle={t.weeklyOccupancy} testId="metric-nearly-full-weeks" title={t.nearlyFullWeeks} value={m.nearly_full_weeks} />
         <MetricCard subtitle={t.weeklyOccupancy} testId="metric-full-weeks" title={t.fullWeeks} value={m.full_weeks} />
         <MetricCard subtitle={t.bookings} testId="metric-dogs-pending-intake" title={t.dogsPendingIntake} value={m.dogs_pending_intake} />
@@ -1617,7 +1617,7 @@ const DashboardView = ({ dashboard, language, currencyCode }) => {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
         {[{ key: "capacity_breakdown", title: t.capacityBreakdown }, { key: "dog_status_breakdown", title: t.dogStatusBreakdown }].map((chart, chartIndex) => (
           <Card className="surface-panel rounded-[1.75rem] border-white/10" data-testid={`pie-chart-${chart.key}`} key={chart.key}>
             <CardHeader>
@@ -1662,7 +1662,7 @@ const DashboardView = ({ dashboard, language, currencyCode }) => {
           </CardContent>
         </Card>
       </div>
-      <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
+      <div className="grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
         <Card className="surface-panel rounded-[1.75rem] border-white/10">
           <CardHeader>
             <CardTitle className="text-white">{t.weeklyOccupancy}</CardTitle>
@@ -1747,20 +1747,20 @@ const BookingsView = ({ bookings, bookingsMeta = { total: 0, total_pages: 1, pag
           </div>
         </CardHeader>
         <CardContent className="grid gap-4">
-          <div className="grid gap-3 xl:grid-cols-4 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-zinc-500" />
               <Input className="pl-9" data-testid="booking-search-input" onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} placeholder={t.searchPlaceholder} value={filters.search} />
             </div>
-            <select className="h-11 rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="booking-filter-status" onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))} value={filters.status}>
+            <select className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="booking-filter-status" onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))} value={filters.status}>
               <option value="all">{t.allStatuses}</option>
               {STATUS_OPTIONS.map((status) => <option key={status} value={status}>{t.status[status] || status}</option>)}
             </select>
-            <select className="h-11 rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="booking-filter-program" onChange={(event) => setFilters((current) => ({ ...current, programId: event.target.value }))} value={filters.programId}>
+            <select className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="booking-filter-program" onChange={(event) => setFilters((current) => ({ ...current, programId: event.target.value }))} value={filters.programId}>
               <option value="all">{t.allPrograms}</option>
               {programs.map((program) => <option key={program.id} value={program.id}>{language === "es" ? program.name_es : program.name_en}</option>)}
             </select>
-            <select className="h-11 rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="booking-filter-week" onChange={(event) => setFilters((current) => ({ ...current, weekStart: event.target.value }))} value={filters.weekStart}>
+            <select className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="booking-filter-week" onChange={(event) => setFilters((current) => ({ ...current, weekStart: event.target.value }))} value={filters.weekStart}>
               <option value="all">{t.allWeeks}</option>
               {weekOptions.map((week) => <option key={week} value={week}>{week}</option>)}
             </select>
@@ -1878,7 +1878,7 @@ const ProgramsView = ({ programs, language, onSaveProgram, currencyCode }) => {
   const update = (key, value) => setFormState((current) => ({ ...current, [key]: value }));
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]" data-testid="admin-programs-view">
+    <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]" data-testid="admin-programs-view">
       <div className="grid gap-4">
         {programs.map((program) => (
           <Card className="surface-panel rounded-[1.75rem] border-white/10" data-testid={`admin-program-card-${program.id}`} key={program.id}>
@@ -2178,7 +2178,7 @@ const SettingsView = ({ settings, emailLogs, onSaveSettings, onUploadLogo, onUpl
   }));
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]" data-testid="admin-settings-view">
+    <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]" data-testid="admin-settings-view">
       <Card className="surface-panel rounded-[1.75rem] border-white/10">
         <CardHeader>
           <CardTitle className="text-white">{t.settings}</CardTitle>
@@ -2210,7 +2210,7 @@ const SettingsView = ({ settings, emailLogs, onSaveSettings, onUploadLogo, onUpl
               <Input data-testid="settings-smtp-host-input" onChange={(event) => update("smtp_host", event.target.value)} placeholder={t.smtpHost} value={formState.smtp_host || ""} />
               <Input data-testid="settings-smtp-port-input" onChange={(event) => update("smtp_port", Number(event.target.value))} placeholder={t.smtpPort} type="number" value={formState.smtp_port || 587} />
               <Input data-testid="settings-smtp-username-input" onChange={(event) => update("smtp_username", event.target.value)} placeholder={t.smtpUsername} value={formState.smtp_username || ""} />
-              <select className="h-11 rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="settings-smtp-tls-select" onChange={(event) => update("smtp_tls", event.target.value === "true")} value={String(formState.smtp_tls)}>
+              <select className="h-11 w-full rounded-xl border border-white/10 bg-zinc-950 px-3 text-white" data-testid="settings-smtp-tls-select" onChange={(event) => update("smtp_tls", event.target.value === "true")} value={String(formState.smtp_tls)}>
                 <option value="true">{t.yes}</option>
                 <option value="false">{t.no}</option>
               </select>
