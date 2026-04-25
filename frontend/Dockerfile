@@ -24,6 +24,4 @@ RUN npm run build
 
 RUN npm install -g serve@13
 
-RUN printf '#!/bin/sh\nP=${PORT:-3000}\n[ "$P" = "null" ] && P=3000\nexec serve -s /app/build -l "$P"\n' > /start.sh && chmod +x /start.sh
-
-CMD ["/start.sh"]
+CMD ["npx", "serve", "-s", "build", "-l", "3000"]
