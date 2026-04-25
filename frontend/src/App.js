@@ -41,7 +41,6 @@ import {
   Phone,
   Search,
   Settings,
-  ShieldAlert,
   ShieldCheck,
   UploadCloud,
   X,
@@ -50,7 +49,6 @@ import {
   Maximize,
   ExternalLink,
   Download,
-  Eye,
   Users,
   Trash2,
   Plus,
@@ -73,8 +71,8 @@ import { toast } from "sonner";
 import { adminApi, openProtectedDocument, publicApi } from "@/lib/api";
 import { translations } from "@/lib/translations";
 
-const HERO_IMAGE = "/assets/hero-default.jpg";
-const CONTENT_IMAGE = "/assets/program-default.jpg";
+const HERO_IMAGE = "https://res.cloudinary.com/dyuksod2i/image/upload/f_auto,q_auto:good,w_1400,c_limit/pawstraining/defaults/hero-default";
+const CONTENT_IMAGE = "https://res.cloudinary.com/dyuksod2i/image/upload/f_auto,q_auto:good,w_800,c_limit/pawstraining/defaults/program-default";
 const CHART_COLORS = ["#dc2626", "#d4d4d8", "#22c55e", "#3b82f6", "#facc15", "#8b5cf6"];
 const STATUS_OPTIONS = ["Pending Review", "Approved", "Rejected", "Scheduled", "In Training", "Delivered", "Cancelled", "Expired"];
 const DOC_STATUS_OPTIONS = ["Pending Review", "Verified", "Invalid"];
@@ -1971,8 +1969,9 @@ const CapacityView = ({ capacityWeeks, language, onSaveCapacity }) => {
   );
 };
 
-const WeeklyOperationsView = ({ bookings, capacityWeeks, language }) => {
+const WeeklyOperationsView = ({ bookings, capacityWeeks, language, adminRole }) => {
   const t = translations[language];
+  const isOp = adminRole === "operator";
   const operationalStatuses = ["Pending Review", "Approved", "Scheduled", "In Training", "Delivered"];
   const weeksWithDogs = useMemo(
     () =>
@@ -2400,13 +2399,14 @@ const UserManagementView = ({ token, language, currentRole, currentUserId }) => 
   );
 };
 
-const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicData, config }) => {
+const AdminShell = ({ language, setLanguage, session, setSession, onLogout, refreshPublicData, config }) => {
   const t = translations[language];
   const location = useLocation();
   const navigate = useNavigate();
   const [dashboard, setDashboard] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [bookingsPage, setBookingsPage] = useState(1);
+  const bookingsPageRef = useRef(1);
   const [bookingsMeta, setBookingsMeta] = useState({ total: 0, total_pages: 1, page: 1 });
   const [programs, setPrograms] = useState([]);
   const [capacityWeeks, setCapacityWeeks] = useState([]);
@@ -2422,12 +2422,16 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
 
   const isOperator = adminRole === "operator";
 
+  useEffect(() => {
+    bookingsPageRef.current = bookingsPage;
+  }, [bookingsPage]);
+
   const refreshAll = useCallback(async (showLoader = true) => {
     if (showLoader) {
       setLoading(true);
     }
     try {
-      const bookingsResponse = await adminApi.getBookings(session.token, { page: bookingsPage, limit: 20 });
+      const bookingsResponse = await adminApi.getBookings(session.token, { page: bookingsPageRef.current, limit: 20 });
       setBookings(bookingsResponse.bookings || []);
       setBookingsMeta({ total: bookingsResponse.total || 0, total_pages: bookingsResponse.total_pages || 1, page: bookingsResponse.page || 1 });
 
@@ -2461,7 +2465,7 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
         setLoading(false);
       }
     }
-  }, [adminRole, bookingsPage, isOperator, language, navigate, onLogout, session.token]);
+  }, [adminRole, isOperator, language, navigate, onLogout, session.token]);
 
   useEffect(() => {
     if (location.pathname === "/admin") {
@@ -2472,6 +2476,18 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
   useEffect(() => {
     refreshAll();
   }, [refreshAll]);
+
+  const fetchBookingsPage = useCallback((page) => {
+    adminApi.getBookings(session.token, { page, limit: 20 }).then((res) => {
+      setBookings(res.bookings || []);
+      setBookingsMeta({ total: res.total || 0, total_pages: res.total_pages || 1, page: res.page || 1 });
+    }).catch(() => {});
+  }, [session.token]);
+
+  const handlePageChange = useCallback((newPage) => {
+    setBookingsPage(newPage);
+    fetchBookingsPage(newPage);
+  }, [fetchBookingsPage]);
 
   useEffect(() => {
     if (currentSection !== "operations-screen") {
@@ -2693,14 +2709,14 @@ const AdminShell = ({ language, setLanguage, session, onLogout, refreshPublicDat
                   currencyCode={config?.currency || "USD"}
                   language={language}
                   onManualCreate={isSuperadminOrAdmin ? createManualBooking : null}
-                  onPageChange={setBookingsPage}
+                  onPageChange={handlePageChange}
                   onUpdateBooking={saveBooking}
                   onFinalPaymentUpload={isSuperadminOrAdmin ? uploadFinalPaymentProof : null}
                   programs={programs}
                   token={session.token}
                 />
               )}
-              {currentSection === "weekly-operations" && isSuperadminOrAdmin && <WeeklyOperationsView bookings={bookings} capacityWeeks={capacityWeeks} language={language} />}
+              {currentSection === "weekly-operations" && isSuperadminOrAdmin && <WeeklyOperationsView adminRole={adminRole} bookings={bookings} capacityWeeks={capacityWeeks} language={language} />}
               {currentSection === "programs" && adminRole === "superadmin" && <ProgramsView currencyCode={config?.currency || "USD"} language={language} onSaveProgram={saveProgram} programs={programs} />}
               {currentSection === "capacity" && adminRole === "superadmin" && <CapacityView capacityWeeks={capacityWeeks} language={language} onSaveCapacity={saveCapacity} />}
               {currentSection === "settings" && adminRole === "superadmin" && (
@@ -2761,6 +2777,7 @@ const AppRoutes = ({ publicState, session, setSession, language, setLanguage, re
               onLogout={handleLogout}
               refreshPublicData={refreshPublicData}
               session={session}
+              setSession={setSession}
               setLanguage={setLanguage}
             />
           </RequireAdmin>

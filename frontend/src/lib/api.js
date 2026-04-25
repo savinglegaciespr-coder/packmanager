@@ -8,6 +8,16 @@ const client = axios.create({
   timeout: 15000,
 });
 
+const cache = new Map();
+const withCache = async (key, ttlMs, fetcher) => {
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.ts < ttlMs) return cached.data;
+  const data = await fetcher();
+  cache.set(key, { data, ts: Date.now() });
+  return data;
+};
+export const invalidateCache = (key) => cache.delete(key);
+
 const authConfig = (token) => ({
   headers: {
     Authorization: `Bearer ${token}`,
@@ -20,20 +30,24 @@ const normalizeError = (error) => {
 
 export const publicApi = {
   async getConfig() {
-    try {
-      const response = await client.get("/public/config");
-      return response.data;
-    } catch (error) {
-      return normalizeError(error);
-    }
+    return withCache("public:config", 60_000, async () => {
+      try {
+        const response = await client.get("/public/config");
+        return response.data;
+      } catch (error) {
+        return normalizeError(error);
+      }
+    });
   },
   async getPrograms() {
-    try {
-      const response = await client.get("/public/programs");
-      return response.data;
-    } catch (error) {
-      return normalizeError(error);
-    }
+    return withCache("public:programs", 60_000, async () => {
+      try {
+        const response = await client.get("/public/programs");
+        return response.data;
+      } catch (error) {
+        return normalizeError(error);
+      }
+    });
   },
   async getWeeks(programId) {
     try {
@@ -135,6 +149,7 @@ export const adminApi = {
   async createProgram(token, payload) {
     try {
       const response = await client.post("/admin/programs", payload, authConfig(token));
+      invalidateCache("public:programs");
       return response.data;
     } catch (error) {
       return normalizeError(error);
@@ -143,6 +158,7 @@ export const adminApi = {
   async updateProgram(token, programId, payload) {
     try {
       const response = await client.put(`/admin/programs/${programId}`, payload, authConfig(token));
+      invalidateCache("public:programs");
       return response.data;
     } catch (error) {
       return normalizeError(error);
@@ -175,6 +191,7 @@ export const adminApi = {
   async updateSettings(token, payload) {
     try {
       const response = await client.put("/admin/settings", payload, authConfig(token));
+      invalidateCache("public:config");
       return response.data;
     } catch (error) {
       return normalizeError(error);
