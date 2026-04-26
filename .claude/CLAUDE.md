@@ -58,36 +58,7 @@ CLOUDINARY_API_SECRET=<see Railway>
 REACT_APP_BACKEND_URL=https://packmanager-production-dfd2.up.railway.app
 ```
 
-## Completed tasks
 
-| Task | Description | Commit |
-|------|-------------|--------|
-| Task 1 | Enforce 10 MB upload size limit | `9786361` |
-| Task 2 | (see git log) | — |
-| Task 3 | Add MongoDB indexes on startup | `cfef8c0` |
-| Task 4 | Paginate admin bookings endpoint in MongoDB | `7287e94` |
-| Task 5 | Cloudinary integration — replace local `./backend/storage/` with Cloudinary uploads under `pawstraining/` folder | `618658c` |
-| Task 6 | Pin bcrypt to 4.0.1 to fix passlib warning | `0afbdde` |
-| Deploy frontend | Railway config (`frontend/railway.json`), service created and deployed | `58b9885` |
-| Task 4 frontend | Pagination support in BookingsView — reads `{bookings, total, page, total_pages}` from API, shows prev/next controls | `(latest)` |
-| Frontend build fix | Switch to Dockerfile builder, fix CRA/Node20 ajv conflicts, disable ESLint plugin, stub ForkTsChecker, pin serve@13 | `b78466f` |
-| Backend Cloudinary fix | Add missing CLOUDINARY_* env vars to Railway backend service (were causing CRASHED state) | `2026-04-24` |
-| Frontend SPA fix | Fix Railway PORT handling + ajv conflict (symlink schema-utils ajv@8 into ajv-keywords, /start.sh PORT-aware serve). Frontend now serves React SPA correctly at https://frontend-production-d4977.up.railway.app | `8afced6` |
-
-## API shape — GET /api/admin/bookings
-
-Backend returns (since Task 4):
-```json
-{
-  "bookings": [...],
-  "total": 42,
-  "page": 1,
-  "limit": 20,
-  "total_pages": 3
-}
-```
-
-Query params accepted: `status_filter`, `program_id`, `week_start`, `search`, `page` (default 1), `limit` (default 20).
 
 ## Deployment workflow
 

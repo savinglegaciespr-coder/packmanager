@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Literal, Optional
 
 from cryptography.fernet import Fernet, InvalidToken
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, status, Query
 from fastapi.responses import RedirectResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
@@ -87,7 +87,10 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    await send_telegram_message(f"❌ Error: {exc}")
+    import re
+    msg = str(exc)[:200]
+    msg = re.sub(r'(?i)(token|password|MONGO_URL)[=:\s]*[^\s\'"]+', r'\1=***', msg)
+    await send_telegram_message(f"❌ Error: {msg}")
     raise exc
 
 
@@ -490,15 +493,18 @@ def default_programs() -> List[Dict[str, Any]]:
 
 async def ensure_demo_admin() -> None:
     existing = await db.admins.find_one({"email": DEMO_ADMIN_EMAIL}, {"_id": 0})
+    if existing:
+        await db.admins.update_one(
+            {"email": DEMO_ADMIN_EMAIL}, 
+            {"$set": {"name": DEMO_ADMIN_NAME, "role": "superadmin"}}
+        )
+        return
     target = {
         "name": DEMO_ADMIN_NAME,
         "email": DEMO_ADMIN_EMAIL,
         "password_hash": pwd_context.hash(DEMO_ADMIN_PASSWORD),
         "role": "superadmin",
     }
-    if existing:
-        await db.admins.update_one({"email": DEMO_ADMIN_EMAIL}, {"$set": target})
-        return
     admin_doc = {
         "id": str(uuid.uuid4()),
         **target,
@@ -1291,7 +1297,7 @@ async def get_public_programs() -> List[Dict[str, Any]]:
 
 
 @api_router.get("/public/weeks")
-async def get_public_weeks(program_id: str, count: int = 16) -> Dict[str, Any]:
+async def get_public_weeks(program_id: str, count: int = Query(16, ge=1, le=52)) -> Dict[str, Any]:
     program = await get_active_program(program_id)
     weeks = await generate_weeks(count)
     return {"program_id": program_id, "span_weeks": get_program_span_weeks(program), "weeks": weeks}
@@ -1407,7 +1413,7 @@ async def get_admin_bookings(
     week_start: Optional[str] = None,
     search: Optional[str] = None,
     page: int = 1,
-    limit: int = 20,
+    limit: int = Query(default=20, ge=1, le=100),
     admin: Dict[str, Any] = Depends(get_current_admin),
 ) -> Dict[str, Any]:
     await expire_stale_bookings()
@@ -1620,7 +1626,7 @@ async def update_program(program_id: str, payload: ProgramPayload, _: Dict[str, 
 
 
 @api_router.get("/admin/capacity")
-async def get_capacity(_: Dict[str, Any] = Depends(get_current_admin), count: int = 16) -> List[Dict[str, Any]]:
+async def get_capacity(_: Dict[str, Any] = Depends(get_current_admin), count: int = Query(16, ge=1, le=52)) -> List[Dict[str, Any]]:
     return await generate_weeks(count)
 
 
