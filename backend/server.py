@@ -441,6 +441,8 @@ def default_settings() -> Dict[str, Any]:
         "smtp_tls": True,
         "smtp_username": "Pawstraningpr@gmail.com",
         "smtp_password_encrypted": None,
+        "stripe_account_id": "",
+        "stripe_onboarding_complete": False,
         "updated_at": iso_now(),
     }
 
@@ -538,6 +540,10 @@ async def ensure_seed_data() -> None:
             updates["smtp_username"] = defaults["smtp_username"]
         if "smtp_password_encrypted" not in current_settings:
             updates["smtp_password_encrypted"] = defaults["smtp_password_encrypted"]
+        if "stripe_account_id" not in current_settings:
+            updates["stripe_account_id"] = defaults["stripe_account_id"]
+        if "stripe_onboarding_complete" not in current_settings:
+            updates["stripe_onboarding_complete"] = defaults["stripe_onboarding_complete"]
 
         landing_content = current_settings.get("landing_content")
         if not isinstance(landing_content, dict):
@@ -1269,6 +1275,7 @@ async def get_public_config() -> Dict[str, Any]:
         "logo_url": settings_doc.get("logo_url") or ("/api/public/assets/logo" if settings_doc.get("logo_asset") else ""),
         "landing_hero_image_url": settings_doc.get("landing_hero_image_url") or ("/api/public/assets/landing-hero" if settings_doc.get("landing_hero_image_asset") else ""),
         "operational_start": OPERATIONAL_START.isoformat(),
+        "stripe_enabled": bool(settings_doc.get("stripe_onboarding_complete", False)),
     }
 
 
@@ -1325,9 +1332,13 @@ async def create_public_booking(
     behavior_goals: str = Form(...),
     current_medication: str = Form(""),
     additional_notes: str = Form(""),
-    payment_proof: UploadFile = File(...),
+    payment_method: str = Form("manual"),
+    payment_proof: Optional[UploadFile] = File(None),
     vaccination_certificate: UploadFile = File(...),
 ) -> Dict[str, Any]:
+    if payment_method not in {"manual", "stripe"}:
+        raise HTTPException(status_code=400, detail="Invalid payment method.")
+
     program = await get_active_program(program_id)
     span_weeks = get_program_span_weeks(program)
     normalized_start = parse_week_start(start_week).isoformat()
@@ -1335,7 +1346,14 @@ async def create_public_booking(
 
     booking_id = str(uuid.uuid4())
     final_payment_token = secrets.token_urlsafe(32)
-    payment_file = await save_upload(payment_proof, booking_id, "payment-proof")
+    
+    if payment_method == "manual":
+        if not payment_proof:
+            raise HTTPException(status_code=400, detail="Payment proof is required for manual payments.")
+        payment_file = await save_upload(payment_proof, booking_id, "payment-proof")
+    else:
+        payment_file = None
+        
     certificate_file = await save_upload(vaccination_certificate, booking_id, "vaccination-certificate")
     now = iso_now()
     booking_doc = {
@@ -1372,6 +1390,10 @@ async def create_public_booking(
             "current_medication": current_medication,
             "additional_notes": additional_notes,
         },
+        "payment_method": payment_method,
+        "payment_stage": "deposit",
+        "stripe_session_id": None,
+        "stripe_payment_status": None,
         "payment_proof": payment_file,
         "vaccination_certificate": certificate_file,
         "payment_status": "Pending Review",
