@@ -200,6 +200,7 @@ const LandingPage = ({ config, programs, language, setLanguage, showAdminAccess 
 const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess }) => {
   const t = translations[language];
   const currencyCode = config?.currency || "USD";
+  const [paymentMethod, setPaymentMethod] = useState("manual");
   const [selectedProgramId, setSelectedProgramId] = useState(programs[0]?.id || "");
   const [weeks, setWeeks] = useState([]);
   const [loadingWeeks, setLoadingWeeks] = useState(false);
@@ -524,19 +525,47 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
                 <Input data-testid="dog-medication-input" onChange={(event) => updateField("current_medication", event.target.value)} placeholder={t.medication} value={formState.current_medication} />
                 <Input data-testid="dog-notes-input" onChange={(event) => updateField("additional_notes", event.target.value)} placeholder={t.notes} value={formState.additional_notes} />
               </section>
-              <section className="grid gap-4 md:grid-cols-2">
-                <div className="md:col-span-2">
-                  <p className="mb-2 text-sm uppercase tracking-[0.2em] text-zinc-500">{t.documents}</p>
+              <div className="space-y-3">
+                <p className="text-sm text-zinc-300">Método de pago</p>
+
+                <div className="flex gap-3">
+                  <button type="button"
+                    onClick={() => setPaymentMethod("manual")}
+                    className={paymentMethod === "manual" ? "bg-red-600 text-white px-4 py-2 rounded" : "bg-zinc-800 text-white px-4 py-2 rounded"}>
+                    Manual
+                  </button>
+
+                  {config?.stripe_enabled && (
+                    <button type="button"
+                      onClick={() => setPaymentMethod("stripe")}
+                      className={paymentMethod === "stripe" ? "bg-red-600 text-white px-4 py-2 rounded" : "bg-zinc-800 text-white px-4 py-2 rounded"}>
+                      Tarjeta
+                    </button>
+                  )}
                 </div>
-                <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4">
-                  <p className="mb-3 text-sm text-zinc-300">{t.paymentProof}</p>
-                  <input accept=".pdf,image/*" data-testid="payment-proof-input" onChange={(event) => updateField("payment_proof", event.target.files?.[0] || null)} required type="file" />
+              </div>
+
+              {paymentMethod === "manual" && (
+                <section className="grid gap-4 md:grid-cols-2">
+                  <div className="md:col-span-2">
+                    <p className="mb-2 text-sm uppercase tracking-[0.2em] text-zinc-500">{t.documents}</p>
+                  </div>
+                  <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4">
+                    <p className="mb-3 text-sm text-zinc-300">{t.paymentProof}</p>
+                    <input accept=".pdf,image/*" data-testid="payment-proof-input" onChange={(event) => updateField("payment_proof", event.target.files?.[0] || null)} required type="file" />
+                  </div>
+                  <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4">
+                    <p className="mb-3 text-sm text-zinc-300">{t.vaccinationCertificate}</p>
+                    <input accept=".pdf,image/*" data-testid="vaccination-certificate-input" onChange={(event) => updateField("vaccination_certificate", event.target.files?.[0] || null)} required type="file" />
+                  </div>
+                </section>
+              )}
+
+              {paymentMethod === "stripe" && (
+                <div className="text-white text-sm">
+                  Pago con tarjeta disponible al continuar.
                 </div>
-                <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4">
-                  <p className="mb-3 text-sm text-zinc-300">{t.vaccinationCertificate}</p>
-                  <input accept=".pdf,image/*" data-testid="vaccination-certificate-input" onChange={(event) => updateField("vaccination_certificate", event.target.files?.[0] || null)} required type="file" />
-                </div>
-              </section>
+              )}
               <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-5" data-testid="deposit-policy-notice">
                 <p className="text-sm font-semibold text-yellow-200">{t.depositPolicyTitle}</p>
                 <p className="mt-2 text-sm text-yellow-200/80">{t.depositPolicyText}</p>
