@@ -171,6 +171,7 @@ class SettingsUpdate(BaseModel):
     smtp_tls: Optional[bool] = None
     smtp_username: Optional[str] = None
     smtp_password: Optional[str] = None
+    stripe_enabled: Optional[bool] = None
 
 
 class BookingUpdateRequest(BaseModel):
