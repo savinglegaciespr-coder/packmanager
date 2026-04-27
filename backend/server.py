@@ -28,6 +28,7 @@ from slowapi.util import get_remote_address
 
 import cloudinary
 import cloudinary.uploader
+import stripe
 
 from utils.notifications import send_telegram_message
 from utils.telegram_bot import handle_update as handle_telegram_update, register_webhook as register_telegram_webhook
@@ -1728,6 +1729,33 @@ async def get_document(booking_id: str, document_type: str, _: Dict[str, Any] = 
     if not cloudinary_url:
         raise HTTPException(status_code=404, detail="Document not available.")
     return RedirectResponse(url=cloudinary_url)
+
+
+@api_router.get("/api/test/stripe-connect-link")
+async def test_stripe_connect(request: Request):
+    stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
+    frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+
+    settings_doc = await get_business_settings()
+    account_id = settings_doc.get("stripe_account_id")
+
+    if not account_id:
+        account = await asyncio.to_thread(stripe.Account.create, type="express")
+        account_id = account.id
+        await db.settings.update_one(
+            {"id": "business-config"},
+            {"$set": {"stripe_account_id": account_id}}
+        )
+
+    account_link = await asyncio.to_thread(
+        stripe.AccountLink.create,
+        account=account_id,
+        refresh_url=f"{frontend_url}/",
+        return_url=f"{frontend_url}/",
+        type="account_onboarding"
+    )
+
+    return {"url": account_link.url}
 
 
 @api_router.post("/admin/bookings/{booking_id}/final-payment-proof")
