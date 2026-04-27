@@ -1232,6 +1232,16 @@ const SettingsView = ({ settings, emailLogs, onSaveSettings, onUploadLogo, onUpl
             </select>
             <p className="mt-2 text-sm text-zinc-500">{t.currencyHelp}</p>
           </div>
+          <div className="md:col-span-2 rounded-2xl border border-white/10 bg-black/20 p-4 flex items-center justify-between">
+            <div>
+              <label className="block text-sm font-semibold text-white">Activar pagos con Stripe</label>
+              <p className="mt-1 text-sm text-zinc-400">Habilita el pago con tarjeta en el proceso de reserva.</p>
+            </div>
+            <label className="relative inline-flex cursor-pointer items-center">
+              <input checked={Boolean(formState.stripe_enabled)} className="peer sr-only" onChange={(e) => update("stripe_enabled", e.target.checked)} type="checkbox" />
+              <div className="peer h-6 w-11 rounded-full bg-zinc-700 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-zinc-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-red-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+            </label>
+          </div>
           <div className="md:col-span-2 rounded-2xl border border-white/10 bg-black/20 p-5" data-testid="smtp-settings-section">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm font-semibold text-white">{t.smtpSettings}</p>
