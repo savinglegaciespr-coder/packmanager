@@ -1731,7 +1731,7 @@ async def get_document(booking_id: str, document_type: str, _: Dict[str, Any] = 
     return RedirectResponse(url=cloudinary_url)
 
 
-@api_router.get("/api/test/stripe-connect-link")
+@api_router.get("/test/stripe-connect-link")
 async def test_stripe_connect(request: Request):
     stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
     frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:5173")
