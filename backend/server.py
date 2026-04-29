@@ -1750,6 +1750,8 @@ async def get_settings(_: Dict[str, Any] = Depends(require_role("superadmin"))) 
 @api_router.put("/admin/settings")
 async def update_settings(payload: SettingsUpdate, _: Dict[str, Any] = Depends(require_role("superadmin"))) -> Dict[str, Any]:
     updates = payload.model_dump(exclude_none=True)
+    if "stripe_enabled" in updates:
+        updates["stripe_onboarding_complete"] = updates.pop("stripe_enabled")
     smtp_password = updates.pop("smtp_password", None)
     if smtp_password and smtp_password.strip():
         updates["smtp_password_encrypted"] = encrypt_secret(smtp_password.strip())

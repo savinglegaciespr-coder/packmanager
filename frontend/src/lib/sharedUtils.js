@@ -37,6 +37,7 @@ export const normalizeLandingContent = (landingContent = {}) => ({
 
 export const normalizeSettingsState = (settings = {}) => ({
   ...settings,
+  stripe_enabled: Boolean(settings?.stripe_onboarding_complete ?? settings?.stripe_enabled),
   currency: settings?.currency || "USD",
   landing_content: normalizeLandingContent(settings?.landing_content),
   smtp_host: settings?.smtp_host || "smtp.gmail.com",
