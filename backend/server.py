@@ -1458,10 +1458,17 @@ async def create_stripe_checkout_session(booking_id: str) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail="Invalid deposit amount.")
 
     settings_doc = await get_business_settings()
+    connected_account_id = settings_doc.get("stripe_account_id", "")
+    if not connected_account_id:
+        raise HTTPException(status_code=503, detail="Stripe Connect account not configured.")
+
     currency = settings_doc.get("currency", "USD").lower()
     frontend_url = os.environ.get("FRONTEND_URL", "https://frontend-production-d4977.up.railway.app").rstrip("/")
     product_name = booking.get("program_name_es") or booking.get("program_name_en") or "Depósito"
     owner_email = booking.get("owner", {}).get("email") or None
+
+    # 0.6% platform fee; connected account receives the remainder automatically
+    platform_fee_cents = max(1, int(round(deposit_cents * 0.006)))
 
     session = await asyncio.to_thread(
         stripe.checkout.Session.create,
@@ -1479,6 +1486,10 @@ async def create_stripe_checkout_session(booking_id: str) -> Dict[str, Any]:
         cancel_url=f"{frontend_url}/book",
         customer_email=owner_email,
         metadata={"booking_id": booking_id},
+        payment_intent_data={
+            "application_fee_amount": platform_fee_cents,
+            "transfer_data": {"destination": connected_account_id},
+        },
     )
 
     await db.bookings.update_one(
