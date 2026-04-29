@@ -1483,7 +1483,7 @@ async def create_stripe_checkout_session(booking_id: str) -> Dict[str, Any]:
         }],
         mode="payment",
         success_url=f"{frontend_url}/book?stripe_success=true&booking_id={booking_id}",
-        cancel_url=f"{frontend_url}/book",
+        cancel_url=f"{frontend_url}/book?stripe_cancel=true",
         customer_email=owner_email,
         metadata={"booking_id": booking_id},
         payment_intent_data={

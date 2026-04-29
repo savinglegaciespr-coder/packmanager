@@ -283,6 +283,12 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
 
   useEffect(() => { loadWeeks(); }, [loadWeeks]);
 
+  useEffect(() => {
+    if (searchParams.get("stripe_cancel") === "true") {
+      toast.error(language === "es" ? "Pago cancelado. Puedes intentarlo de nuevo." : "Payment cancelled. You can try again.");
+    }
+  }, []);
+
   const updateField = (name, value) => setFormState((current) => ({ ...current, [name]: value }));
 
   const handleSubmit = async (event) => {
