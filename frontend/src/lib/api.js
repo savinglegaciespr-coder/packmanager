@@ -106,6 +106,14 @@ export const publicApi = {
       return normalizeError(error);
     }
   },
+  async createStripeSession(bookingId) {
+    try {
+      const response = await client.post(`/public/bookings/${bookingId}/create-stripe-session`);
+      return response.data;
+    } catch (error) {
+      return normalizeError(error);
+    }
+  },
 };
 
 export const adminApi = {

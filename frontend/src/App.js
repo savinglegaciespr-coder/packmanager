@@ -7,6 +7,7 @@ import {
   Route,
   Routes,
   useParams,
+  useSearchParams,
 } from "react-router-dom";
 import {
   AlertTriangle,
@@ -200,12 +201,17 @@ const LandingPage = ({ config, programs, language, setLanguage, showAdminAccess 
 const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess }) => {
   const t = translations[language];
   const currencyCode = config?.currency || "USD";
+  const [searchParams] = useSearchParams();
   const [paymentMethod, setPaymentMethod] = useState("manual");
   const [selectedProgramId, setSelectedProgramId] = useState(programs[0]?.id || "");
   const [weeks, setWeeks] = useState([]);
   const [loadingWeeks, setLoadingWeeks] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [bookingResult, setBookingResult] = useState(null);
+  const [bookingResult, setBookingResult] = useState(() =>
+    searchParams.get("stripe_success") === "true" && searchParams.get("booking_id")
+      ? { booking_id: searchParams.get("booking_id"), reservation_expires_at: null, stripe: true }
+      : null
+  );
   const [formState, setFormState] = useState({
     locale: language,
     owner_full_name: "",
@@ -293,8 +299,8 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
       toast.error(t.invalidDogBirthDate);
       return;
     }
-    if (!formState.payment_proof || !formState.vaccination_certificate) {
-      toast.error(language === "es" ? "Debes cargar ambos documentos." : "Both files are required.");
+    if ((paymentMethod === "manual" && !formState.payment_proof) || !formState.vaccination_certificate) {
+      toast.error(language === "es" ? "Debes cargar todos los documentos requeridos." : "Please upload all required documents.");
       return;
     }
     if (!formState.accept_deposit_policy) {
@@ -305,6 +311,7 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
     try {
       const payload = new FormData();
       payload.append("program_id", selectedProgramId);
+      payload.append("payment_method", paymentMethod);
       Object.entries(formState).forEach(([key, value]) => {
         if (key !== "confirm_email" && value !== null && value !== undefined) {
           payload.append(key, value);
@@ -314,6 +321,11 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
       payload.append("date_of_birth", normalizedDogBirthDate);
       payload.append("age", computedDogAge);
       const response = await publicApi.submitBooking(payload);
+      if (paymentMethod === "stripe") {
+        const { url } = await publicApi.createStripeSession(response.booking_id);
+        window.location.href = url;
+        return;
+      }
       setBookingResult(response);
       toast.success(t.bookingSubmitted);
       setFormState((current) => ({
@@ -460,15 +472,25 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
               <div className="rounded-2xl border border-green-500/20 bg-green-500/10 p-4 text-sm text-green-100" data-testid="booking-success-panel">
                 <p className="font-semibold">{t.bookingSubmitted}</p>
                 <p className="mt-2">ID: {bookingResult.booking_id}</p>
-                <p className="mt-1">{t.reservationSummaryPrice}: {formatCurrency(selectedProgram?.price, language, currencyCode)}</p>
-                {selectedProgram && (() => {
-                  const depType = selectedProgram.deposit_type || "percentage";
-                  const depVal = selectedProgram.deposit_value ?? 100;
-                  const dep = depType === "fixed" ? Math.min(depVal, selectedProgram.price) : Math.round(selectedProgram.price * depVal / 100 * 100) / 100;
-                  const bal = Math.round((selectedProgram.price - dep) * 100) / 100;
-                  return <p className="mt-1">{t.depositLabel}: {formatCurrency(dep, language, currencyCode)} · {t.balanceLabel}: {formatCurrency(bal, language, currencyCode)}</p>;
-                })()}
-                <p className="mt-1">{t.reservationHeldUntil}: {bookingResult.reservation_expires_at}</p>
+                {bookingResult.stripe ? (
+                  <p className="mt-2 font-medium">
+                    {language === "es"
+                      ? "✅ Pago con tarjeta completado. Recibirás una confirmación por correo."
+                      : "✅ Card payment completed. You will receive a confirmation by email."}
+                  </p>
+                ) : (
+                  <>
+                    <p className="mt-1">{t.reservationSummaryPrice}: {formatCurrency(selectedProgram?.price, language, currencyCode)}</p>
+                    {selectedProgram && (() => {
+                      const depType = selectedProgram.deposit_type || "percentage";
+                      const depVal = selectedProgram.deposit_value ?? 100;
+                      const dep = depType === "fixed" ? Math.min(depVal, selectedProgram.price) : Math.round(selectedProgram.price * depVal / 100 * 100) / 100;
+                      const bal = Math.round((selectedProgram.price - dep) * 100) / 100;
+                      return <p className="mt-1">{t.depositLabel}: {formatCurrency(dep, language, currencyCode)} · {t.balanceLabel}: {formatCurrency(bal, language, currencyCode)}</p>;
+                    })()}
+                    <p className="mt-1">{t.reservationHeldUntil}: {bookingResult.reservation_expires_at}</p>
+                  </>
+                )}
               </div>
             )}
           </CardContent>
@@ -545,27 +567,21 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
                 </div>
               </div>
 
-              {paymentMethod === "manual" && (
-                <section className="grid gap-4 md:grid-cols-2">
-                  <div className="md:col-span-2">
-                    <p className="mb-2 text-sm uppercase tracking-[0.2em] text-zinc-500">{t.documents}</p>
-                  </div>
+              <section className="grid gap-4 md:grid-cols-2">
+                <div className="md:col-span-2">
+                  <p className="mb-2 text-sm uppercase tracking-[0.2em] text-zinc-500">{t.documents}</p>
+                </div>
+                {paymentMethod === "manual" && (
                   <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4">
                     <p className="mb-3 text-sm text-zinc-300">{t.paymentProof}</p>
                     <input accept=".pdf,image/*" data-testid="payment-proof-input" onChange={(event) => updateField("payment_proof", event.target.files?.[0] || null)} required type="file" />
                   </div>
-                  <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4">
-                    <p className="mb-3 text-sm text-zinc-300">{t.vaccinationCertificate}</p>
-                    <input accept=".pdf,image/*" data-testid="vaccination-certificate-input" onChange={(event) => updateField("vaccination_certificate", event.target.files?.[0] || null)} required type="file" />
-                  </div>
-                </section>
-              )}
-
-              {paymentMethod === "stripe" && (
-                <div className="text-white text-sm">
-                  Pago con tarjeta disponible al continuar.
+                )}
+                <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4">
+                  <p className="mb-3 text-sm text-zinc-300">{t.vaccinationCertificate}</p>
+                  <input accept=".pdf,image/*" data-testid="vaccination-certificate-input" onChange={(event) => updateField("vaccination_certificate", event.target.files?.[0] || null)} required type="file" />
                 </div>
-              )}
+              </section>
               <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-5" data-testid="deposit-policy-notice">
                 <p className="text-sm font-semibold text-yellow-200">{t.depositPolicyTitle}</p>
                 <p className="mt-2 text-sm text-yellow-200/80">{t.depositPolicyText}</p>
