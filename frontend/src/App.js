@@ -567,27 +567,21 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
                 </div>
               </div>
 
-              {paymentMethod === "manual" && (
-                <section className="grid gap-4 md:grid-cols-2">
-                  <div className="md:col-span-2">
-                    <p className="mb-2 text-sm uppercase tracking-[0.2em] text-zinc-500">{t.documents}</p>
-                  </div>
+              <section className="grid gap-4 md:grid-cols-2">
+                <div className="md:col-span-2">
+                  <p className="mb-2 text-sm uppercase tracking-[0.2em] text-zinc-500">{t.documents}</p>
+                </div>
+                {paymentMethod === "manual" && (
                   <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4">
                     <p className="mb-3 text-sm text-zinc-300">{t.paymentProof}</p>
                     <input accept=".pdf,image/*" data-testid="payment-proof-input" onChange={(event) => updateField("payment_proof", event.target.files?.[0] || null)} required type="file" />
                   </div>
-                  <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4">
-                    <p className="mb-3 text-sm text-zinc-300">{t.vaccinationCertificate}</p>
-                    <input accept=".pdf,image/*" data-testid="vaccination-certificate-input" onChange={(event) => updateField("vaccination_certificate", event.target.files?.[0] || null)} required type="file" />
-                  </div>
-                </section>
-              )}
-
-              {paymentMethod === "stripe" && (
-                <div className="text-white text-sm">
-                  Pago con tarjeta disponible al continuar.
+                )}
+                <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4">
+                  <p className="mb-3 text-sm text-zinc-300">{t.vaccinationCertificate}</p>
+                  <input accept=".pdf,image/*" data-testid="vaccination-certificate-input" onChange={(event) => updateField("vaccination_certificate", event.target.files?.[0] || null)} required type="file" />
                 </div>
-              )}
+              </section>
               <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-5" data-testid="deposit-policy-notice">
                 <p className="text-sm font-semibold text-yellow-200">{t.depositPolicyTitle}</p>
                 <p className="mt-2 text-sm text-yellow-200/80">{t.depositPolicyText}</p>
