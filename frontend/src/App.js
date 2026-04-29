@@ -726,7 +726,7 @@ const FinalPaymentPage = ({ language, setLanguage }) => {
 };
 
 const AppRoutes = ({ publicState, session, setSession, language, setLanguage, refreshPublicData }) => {
-  const showAdminAccess = true;
+  const showAdminAccess = Boolean(session?.token);
 
   const handleLogin = async (credentials) => {
     const response = await adminApi.login(credentials);
