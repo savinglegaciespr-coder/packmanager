@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import math
 import os
@@ -1425,6 +1426,68 @@ async def create_public_booking(
     }
 
 
+@api_router.post("/public/bookings/{booking_id}/create-stripe-session")
+async def create_stripe_checkout_session(booking_id: str) -> Dict[str, Any]:
+    stripe_key = os.environ.get("STRIPE_SECRET_KEY", "")
+    if not stripe_key:
+        raise HTTPException(status_code=503, detail="Stripe not configured.")
+
+    booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found.")
+    if booking.get("payment_method") != "stripe":
+        raise HTTPException(status_code=400, detail="Booking does not use Stripe.")
+
+    stripe.api_key = stripe_key
+    existing_session_id = booking.get("stripe_session_id")
+    if existing_session_id:
+        try:
+            existing = await asyncio.to_thread(stripe.checkout.Session.retrieve, existing_session_id)
+            if existing.status == "open":
+                return {"url": existing.url}
+        except Exception:
+            pass
+
+    program_snapshot = booking.get("program_snapshot", {})
+    price = float(booking.get("program_price", 0))
+    dep_type = program_snapshot.get("deposit_type", "percentage")
+    dep_val = float(program_snapshot.get("deposit_value", 100.0))
+    amounts = compute_deposit_amounts(price, dep_type, dep_val)
+    deposit_cents = int(round(amounts["deposit_amount"] * 100))
+    if deposit_cents <= 0:
+        raise HTTPException(status_code=400, detail="Invalid deposit amount.")
+
+    settings_doc = await get_business_settings()
+    currency = settings_doc.get("currency", "USD").lower()
+    frontend_url = os.environ.get("FRONTEND_URL", "https://frontend-production-d4977.up.railway.app").rstrip("/")
+    product_name = booking.get("program_name_es") or booking.get("program_name_en") or "Depósito"
+    owner_email = booking.get("owner", {}).get("email") or None
+
+    session = await asyncio.to_thread(
+        stripe.checkout.Session.create,
+        payment_method_types=["card"],
+        line_items=[{
+            "price_data": {
+                "currency": currency,
+                "product_data": {"name": product_name},
+                "unit_amount": deposit_cents,
+            },
+            "quantity": 1,
+        }],
+        mode="payment",
+        success_url=f"{frontend_url}/book?stripe_success=true&booking_id={booking_id}",
+        cancel_url=f"{frontend_url}/book",
+        customer_email=owner_email,
+        metadata={"booking_id": booking_id},
+    )
+
+    await db.bookings.update_one(
+        {"id": booking_id},
+        {"$set": {"stripe_session_id": session.id, "updated_at": iso_now()}}
+    )
+    return {"url": session.url}
+
+
 @api_router.get("/admin/dashboard")
 async def get_dashboard(_: Dict[str, Any] = Depends(require_role("superadmin", "admin"))) -> Dict[str, Any]:
     return await build_dashboard_payload()
@@ -1771,6 +1834,39 @@ async def upload_final_payment_proof(booking_id: str, file: UploadFile = File(..
     )
     updated = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
     return sanitize_booking(updated)
+
+
+@app.post("/stripe/webhook")
+async def stripe_webhook(request: Request):
+    payload = await request.body()
+    sig = request.headers.get("stripe-signature", "")
+    webhook_secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+
+    if webhook_secret:
+        try:
+            event = stripe.Webhook.construct_event(payload, sig, webhook_secret)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid webhook signature.")
+    else:
+        try:
+            event = json.loads(payload)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid payload.")
+
+    if event.get("type") == "checkout.session.completed":
+        session_data = event["data"]["object"]
+        booking_id = (session_data.get("metadata") or {}).get("booking_id")
+        if booking_id:
+            await db.bookings.update_one(
+                {"id": booking_id},
+                {"$set": {
+                    "stripe_payment_status": "paid",
+                    "payment_status": "Pending Review",
+                    "updated_at": iso_now(),
+                }}
+            )
+
+    return {"ok": True}
 
 
 app.include_router(api_router)
