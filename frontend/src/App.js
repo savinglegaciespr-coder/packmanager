@@ -343,6 +343,8 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
     }
   };
 
+  console.log("BookingPage config stripe_enabled:", config?.stripe_enabled);
+
   return (
     <div className="app-shell" data-testid="booking-page">
       <PublicHeader config={config} language={language} setLanguage={setLanguage} showAdminAccess={showAdminAccess} t={t} />
@@ -502,6 +504,23 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
           </CardHeader>
           <CardContent>
             <form className="grid gap-6" onSubmit={handleSubmit}>
+              <div className="space-y-3" data-testid="payment-method-selector">
+                <p className="text-sm text-zinc-300">Método de pago</p>
+                <div className="flex gap-3">
+                  <button type="button"
+                    onClick={() => setPaymentMethod("manual")}
+                    className={paymentMethod === "manual" ? "bg-red-600 text-white px-4 py-2 rounded" : "bg-zinc-800 text-white px-4 py-2 rounded"}>
+                    Manual
+                  </button>
+                  {config?.stripe_enabled && (
+                    <button type="button"
+                      onClick={() => setPaymentMethod("stripe")}
+                      className={paymentMethod === "stripe" ? "bg-red-600 text-white px-4 py-2 rounded" : "bg-zinc-800 text-white px-4 py-2 rounded"}>
+                      Tarjeta
+                    </button>
+                  )}
+                </div>
+              </div>
               <section className="grid gap-4 md:grid-cols-2">
                 <div className="md:col-span-2">
                   <p className="mb-2 text-sm uppercase tracking-[0.2em] text-zinc-500">{t.ownerInformation}</p>
@@ -547,25 +566,6 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
                 <Input data-testid="dog-medication-input" onChange={(event) => updateField("current_medication", event.target.value)} placeholder={t.medication} value={formState.current_medication} />
                 <Input data-testid="dog-notes-input" onChange={(event) => updateField("additional_notes", event.target.value)} placeholder={t.notes} value={formState.additional_notes} />
               </section>
-              <div className="space-y-3">
-                <p className="text-sm text-zinc-300">Método de pago</p>
-
-                <div className="flex gap-3">
-                  <button type="button"
-                    onClick={() => setPaymentMethod("manual")}
-                    className={paymentMethod === "manual" ? "bg-red-600 text-white px-4 py-2 rounded" : "bg-zinc-800 text-white px-4 py-2 rounded"}>
-                    Manual
-                  </button>
-
-                  {config?.stripe_enabled && (
-                    <button type="button"
-                      onClick={() => setPaymentMethod("stripe")}
-                      className={paymentMethod === "stripe" ? "bg-red-600 text-white px-4 py-2 rounded" : "bg-zinc-800 text-white px-4 py-2 rounded"}>
-                      Tarjeta
-                    </button>
-                  )}
-                </div>
-              </div>
 
               <section className="grid gap-4 md:grid-cols-2">
                 <div className="md:col-span-2">
