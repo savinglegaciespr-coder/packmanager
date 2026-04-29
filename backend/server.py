@@ -1463,7 +1463,6 @@ async def create_stripe_checkout_session(booking_id: str) -> Dict[str, Any]:
         raise HTTPException(status_code=503, detail="Stripe Connect account not configured.")
 
     currency = settings_doc.get("currency", "USD").lower()
-    frontend_url = os.environ.get("FRONTEND_URL", "https://frontend-production-d4977.up.railway.app").rstrip("/")
     product_name = booking.get("program_name_es") or booking.get("program_name_en") or "Depósito"
     owner_email = booking.get("owner", {}).get("email") or None
 
@@ -1482,8 +1481,8 @@ async def create_stripe_checkout_session(booking_id: str) -> Dict[str, Any]:
             "quantity": 1,
         }],
         mode="payment",
-        success_url=f"{frontend_url}/book?stripe_success=true&booking_id={booking_id}",
-        cancel_url=f"{frontend_url}/book?stripe_cancel=true",
+        success_url=f"https://frontend-production-d4977.up.railway.app/book?stripe_success=true&booking_id={booking_id}",
+        cancel_url="https://frontend-production-d4977.up.railway.app/book?stripe_cancel=true",
         customer_email=owner_email,
         metadata={"booking_id": booking_id},
         payment_intent_data={
