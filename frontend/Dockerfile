@@ -6,6 +6,7 @@ ENV REACT_APP_BACKEND_URL=$REACT_APP_BACKEND_URL
 # Disable CRA's ESLint webpack plugin (ajv v6/v8 mismatch) and TS checker
 ENV DISABLE_ESLINT_PLUGIN=true
 ENV TSC_COMPILE_ON_ERROR=true
+ENV CI=false
 
 WORKDIR /app
 
