@@ -209,6 +209,18 @@ const MetricCard = ({ title, value, subtitle, testId }) => (
 const DocumentPreviewModal = ({ doc, onClose, language }) => {
   const t = translations[language];
   const [zoom, setZoom] = useState(1);
+  useEffect(() => {
+    if (!doc) return;
+    const handler = (e) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", handler, true);
+    return () => document.removeEventListener("keydown", handler, true);
+  }, [doc, onClose]);
   if (!doc) return null;
   const openNewTab = () => window.open(doc.url, "_blank", "noopener,noreferrer");
   const downloadFile = () => { const a = document.createElement("a"); a.href = doc.url; a.download = doc.filename; a.click(); };
@@ -331,7 +343,7 @@ const BookingDetailDialog = ({ booking, language, onClose, onSave, token, curren
   const closePreview = () => { if (previewDoc) URL.revokeObjectURL(previewDoc.url); setPreviewDoc(null); };
 
   return (
-    <Dialog onOpenChange={(open) => !open && onClose()} open={Boolean(booking)}>
+    <Dialog onOpenChange={(open) => !open && !previewDoc && onClose()} open={Boolean(booking)}>
       <DialogContent aria-describedby="booking-detail-description" className="mobile-dialog-content max-w-4xl border-white/10 bg-zinc-950 text-white" data-testid="booking-detail-dialog">
         <DialogHeader>
           <DialogTitle>{booking.dog.name} · {booking.owner.full_name}</DialogTitle>

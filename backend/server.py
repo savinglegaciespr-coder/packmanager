@@ -776,15 +776,22 @@ def _smtp_send(smtp_host: str, smtp_port: int, smtp_tls: bool, smtp_username: st
 
 
 async def send_email_via_smtp(settings_doc: Dict[str, Any], recipient: str, subject: str, body: str) -> None:
+    env_password = os.environ.get("SMTP_PASSWORD")
     smtp_password_encrypted = settings_doc.get("smtp_password_encrypted")
-    if not smtp_password_encrypted:
+    if env_password:
+        password = env_password
+    elif smtp_password_encrypted:
+        password = decrypt_secret(smtp_password_encrypted)
+    else:
         raise RuntimeError("SMTP password is not configured.")
 
-    password = decrypt_secret(smtp_password_encrypted)
-    host = settings_doc.get("smtp_host", "smtp.gmail.com")
-    port = int(settings_doc.get("smtp_port", 587))
-    tls = settings_doc.get("smtp_tls", True)
-    username = settings_doc["smtp_username"]
+    host = os.environ.get("SMTP_HOST") or settings_doc.get("smtp_host", "smtp.gmail.com")
+    port = int(os.environ.get("SMTP_PORT") or settings_doc.get("smtp_port", 587))
+    env_tls = os.environ.get("SMTP_TLS")
+    tls = (env_tls.lower() not in ("false", "0", "no")) if env_tls else settings_doc.get("smtp_tls", True)
+    username = os.environ.get("SMTP_USERNAME") or settings_doc.get("smtp_username", "")
+    if not username:
+        raise RuntimeError("SMTP username is not configured.")
 
     logger.info("SMTP send → to=%s subject='%s' host=%s port=%d", recipient, subject, host, port)
     await asyncio.to_thread(_smtp_send, host, port, tls, username, password, recipient, subject, body)
@@ -794,6 +801,8 @@ async def send_email_via_smtp(settings_doc: Dict[str, Any], recipient: str, subj
 async def queue_email(recipient: str, subject: str, body: str, *, audience: str, booking_id: str, locale: str) -> None:
     settings_doc = await get_business_settings()
     delivery_mode = settings_doc.get("email_mode", "internal_log")
+    if os.environ.get("SMTP_PASSWORD") or os.environ.get("SMTP_USERNAME"):
+        delivery_mode = "smtp"
     delivery_status = "logged"
     delivery_error = ""
 
