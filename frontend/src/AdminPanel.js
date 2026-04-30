@@ -1014,16 +1014,17 @@ const CapacityView = ({ capacityWeeks, language, onSaveCapacity }) => {
   );
 };
 
+const OPERATIONAL_STATUSES = ["Pending Review", "Approved", "Scheduled", "In Training", "Delivered"];
+
 const WeeklyOperationsView = ({ bookings, capacityWeeks, language, adminRole }) => {
   const t = translations[language];
   const isOp = adminRole === "operator";
-  const operationalStatuses = ["Pending Review", "Approved", "Scheduled", "In Training", "Delivered"];
   const weeksWithDogs = useMemo(
     () =>
       capacityWeeks.map((week) => ({
         ...week,
         dogs: bookings
-          .filter((booking) => operationalStatuses.includes(booking.status) && booking.week_starts?.includes(week.week_start))
+          .filter((booking) => OPERATIONAL_STATUSES.includes(booking.status) && booking.week_starts?.includes(week.week_start))
           .sort((left, right) => left.dog.name.localeCompare(right.dog.name)),
       })),
     [bookings, capacityWeeks],
@@ -1091,7 +1092,6 @@ const OperationsSummaryCard = ({ title, value, icon: Icon, accentClass, testId }
 
 const OperationsScreenView = ({ bookings, capacityWeeks, dashboard, language, lastUpdated }) => {
   const t = translations[language];
-  const operationalStatuses = ["Pending Review", "Approved", "Scheduled", "In Training", "Delivered"];
 
   const weeksWithAssignments = useMemo(
     () =>
@@ -1099,7 +1099,7 @@ const OperationsScreenView = ({ bookings, capacityWeeks, dashboard, language, la
         .map((week) => ({
           ...week,
           dogs: bookings
-            .filter((booking) => operationalStatuses.includes(booking.status) && booking.week_starts?.includes(week.week_start))
+            .filter((booking) => OPERATIONAL_STATUSES.includes(booking.status) && booking.week_starts?.includes(week.week_start))
             .sort((left, right) => left.dog.name.localeCompare(right.dog.name)),
         }))
         .filter((week) => week.dogs.length > 0),

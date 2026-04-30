@@ -287,6 +287,7 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
     if (searchParams.get("stripe_cancel") === "true") {
       toast.error(language === "es" ? "Pago cancelado. Puedes intentarlo de nuevo." : "Payment cancelled. You can try again.");
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const updateField = (name, value) => setFormState((current) => ({ ...current, [name]: value }));
