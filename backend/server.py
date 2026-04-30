@@ -768,11 +768,29 @@ def _smtp_send(smtp_host: str, smtp_port: int, smtp_tls: bool, smtp_username: st
     message["To"] = recipient
     message.set_content(body)
 
-    with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as server:
-        if smtp_tls:
-            server.starttls()
-        server.login(smtp_username, smtp_password)
-        server.send_message(message)
+    logger.info("SMTP INIT host=%s port=%d tls=%s username=%s to=%s", smtp_host, smtp_port, smtp_tls, smtp_username, recipient)
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as server:
+            logger.info("SMTP CONNECTED host=%s port=%d", smtp_host, smtp_port)
+            if smtp_tls:
+                server.starttls()
+                logger.info("SMTP STARTTLS OK")
+            server.login(smtp_username, smtp_password)
+            logger.info("SMTP AUTH OK username=%s", smtp_username)
+            server.send_message(message)
+            logger.info("SMTP SEND SUCCESS to=%s subject='%s'", recipient, subject)
+    except smtplib.SMTPAuthenticationError as exc:
+        logger.error("SMTP ERROR: authentication failed for %s — %s", smtp_username, exc)
+        raise
+    except smtplib.SMTPConnectError as exc:
+        logger.error("SMTP ERROR: could not connect to %s:%d — %s", smtp_host, smtp_port, exc)
+        raise
+    except smtplib.SMTPException as exc:
+        logger.error("SMTP ERROR: %s — %s", type(exc).__name__, exc)
+        raise
+    except OSError as exc:
+        logger.error("SMTP ERROR: network/OS error — %s", exc)
+        raise
 
 
 async def send_email_via_smtp(settings_doc: Dict[str, Any], recipient: str, subject: str, body: str) -> None:
@@ -1798,6 +1816,37 @@ async def upload_landing_hero_image(file: UploadFile = File(...), _: Dict[str, A
 @api_router.get("/admin/email-logs")
 async def get_email_logs(_: Dict[str, Any] = Depends(require_role("superadmin", "admin"))) -> List[Dict[str, Any]]:
     return await db.email_logs.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+
+
+class TestEmailRequest(BaseModel):
+    recipient: str
+
+
+@api_router.post("/admin/settings/test-email")
+async def test_email_send(payload: TestEmailRequest, _: Dict[str, Any] = Depends(require_role("superadmin"))) -> Dict[str, Any]:
+    settings_doc = await get_business_settings()
+    env_password = os.environ.get("SMTP_PASSWORD")
+    smtp_password_encrypted = settings_doc.get("smtp_password_encrypted")
+    diag = {
+        "email_mode_in_db": settings_doc.get("email_mode", "internal_log"),
+        "smtp_host": settings_doc.get("smtp_host", "smtp.gmail.com"),
+        "smtp_port": settings_doc.get("smtp_port", 587),
+        "smtp_tls": settings_doc.get("smtp_tls", True),
+        "smtp_username": settings_doc.get("smtp_username", ""),
+        "smtp_password_in_db": bool(smtp_password_encrypted),
+        "smtp_password_in_env": bool(env_password),
+    }
+    try:
+        await send_email_via_smtp(
+            settings_doc,
+            payload.recipient,
+            "PAWS TRAINING — Test / Prueba",
+            "This is a test email from PAWS TRAINING. SMTP is working.\n\nEste es un email de prueba de PAWS TRAINING. El SMTP funciona correctamente.",
+        )
+        return {"success": True, "diagnostic": diag}
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Test email failed → %s", exc)
+        return {"success": False, "error": str(exc), "error_type": type(exc).__name__, "diagnostic": diag}
 
 
 @api_router.get("/admin/documents/{booking_id}/{document_type}")
