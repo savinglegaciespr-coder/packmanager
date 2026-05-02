@@ -290,6 +290,14 @@ export const adminApi = {
       }
     });
   },
+  async testEmail(token, recipient) {
+    try {
+      const response = await client.post("/admin/settings/test-email", { recipient }, authConfig(token));
+      return response.data;
+    } catch (error) {
+      return normalizeError(error);
+    }
+  },
   async uploadFinalPaymentProof(token, bookingId, file) {
     const formData = new FormData();
     formData.append("file", file);

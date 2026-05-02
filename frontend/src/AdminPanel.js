@@ -1197,15 +1197,26 @@ const OperationsScreenView = ({ bookings, capacityWeeks, dashboard, language, la
   );
 };
 
-const SettingsView = ({ settings, emailLogs, onSaveSettings, onUploadLogo, onUploadLandingHeroImage, language }) => {
+const SettingsView = ({ settings, emailLogs, onSaveSettings, onUploadLogo, onUploadLandingHeroImage, language, token }) => {
   const t = translations[language];
   const [formState, setFormState] = useState(normalizeSettingsState(settings));
+  const [testRecipient, setTestRecipient] = useState("");
+  const [testResult, setTestResult] = useState(null);
+  const [testLoading, setTestLoading] = useState(false);
 
   useEffect(() => {
     setFormState(normalizeSettingsState(settings));
   }, [settings]);
 
   if (!formState) return null;
+
+  const sendTestEmail = async () => {
+    setTestLoading(true);
+    setTestResult(null);
+    const result = await adminApi.testEmail(token, testRecipient);
+    setTestResult(result);
+    setTestLoading(false);
+  };
 
   const update = (key, value) => setFormState((current) => ({ ...current, [key]: value }));
   const updateLandingField = (key, value) => setFormState((current) => ({
@@ -1273,6 +1284,27 @@ const SettingsView = ({ settings, emailLogs, onSaveSettings, onUploadLogo, onUpl
                 <Input data-testid="settings-smtp-password-input" onChange={(event) => update("smtp_password", event.target.value)} placeholder={formState.smtp_password_masked || "••••••••"} type="password" value={formState.smtp_password} />
                 <p className="mt-2 text-sm text-zinc-500">{t.smtpPasswordHelp}</p>
               </div>
+            </div>
+            <div className="mt-4 border-t border-white/10 pt-4">
+              <p className="mb-3 text-sm font-semibold text-white">{t.testEmailSend}</p>
+              <div className="flex gap-3">
+                <Input data-testid="test-email-recipient-input" onChange={(e) => setTestRecipient(e.target.value)} placeholder={t.testEmailRecipient} type="email" value={testRecipient} />
+                <Button className="touch-button shrink-0 bg-zinc-700 text-white hover:bg-zinc-600" data-testid="test-email-send-button" disabled={testLoading || !testRecipient} onClick={sendTestEmail} type="button">
+                  {testLoading ? t.testEmailSending : t.testEmailSend}
+                </Button>
+              </div>
+              {testResult && (
+                <div className={`mt-3 rounded-xl border p-3 text-sm ${testResult.success ? "border-green-500/25 bg-green-500/10 text-green-200" : "border-red-500/25 bg-red-500/10 text-red-200"}`} data-testid="test-email-result">
+                  <p className="font-semibold">{testResult.success ? t.testEmailSuccess : t.testEmailFailed}</p>
+                  {testResult.error && <p className="mt-1 text-xs opacity-75">{testResult.error}</p>}
+                  {testResult.diagnostic && (
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-xs opacity-60">{t.testEmailDiagnostic}</summary>
+                      <pre className="mt-1 overflow-x-auto text-xs opacity-60">{JSON.stringify(testResult.diagnostic, null, 2)}</pre>
+                    </details>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           <div className="md:col-span-2 grid gap-4 lg:grid-cols-2">
@@ -1782,7 +1814,7 @@ export const AdminShell = ({ language, setLanguage, session, setSession, onLogou
               {currentSection === "programs" && adminRole === "superadmin" && <ProgramsView currencyCode={config?.currency || "USD"} language={language} onSaveProgram={saveProgram} programs={programs} />}
               {currentSection === "capacity" && adminRole === "superadmin" && <CapacityView capacityWeeks={capacityWeeks} language={language} onSaveCapacity={saveCapacity} />}
               {currentSection === "settings" && adminRole === "superadmin" && (
-                <SettingsView emailLogs={emailLogs} language={language} onSaveSettings={saveSettings} onUploadLandingHeroImage={uploadLandingHeroImage} onUploadLogo={uploadLogo} settings={settings} />
+                <SettingsView emailLogs={emailLogs} language={language} onSaveSettings={saveSettings} onUploadLandingHeroImage={uploadLandingHeroImage} onUploadLogo={uploadLogo} settings={settings} token={session.token} />
               )}
               {currentSection === "users" && (adminRole === "superadmin" || adminRole === "admin") && (
                 <UserManagementView currentRole={adminRole} currentUserId={session.admin?.id} language={language} token={session.token} />
