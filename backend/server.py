@@ -29,6 +29,7 @@ from slowapi.util import get_remote_address
 
 import cloudinary
 import cloudinary.uploader
+import httpx
 import stripe
 
 from utils.notifications import send_telegram_message
@@ -816,15 +817,46 @@ async def send_email_via_smtp(settings_doc: Dict[str, Any], recipient: str, subj
     logger.info("SMTP send OK → to=%s", recipient)
 
 
+async def send_email_via_resend(recipient: str, subject: str, body: str) -> None:
+    api_key = os.environ["RESEND_API_KEY"]
+    logger.info("Resend send → to=%s subject='%s'", recipient, subject)
+    async with httpx.AsyncClient(timeout=30) as http:
+        response = await http.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={
+                "from": "PAWS TRAINING <onboarding@resend.dev>",
+                "to": [recipient],
+                "subject": subject,
+                "text": body,
+            },
+        )
+    if response.status_code not in (200, 201):
+        logger.error("Resend error: status=%d body=%s", response.status_code, response.text)
+        raise RuntimeError(f"Resend API error {response.status_code}: {response.text}")
+    logger.info("Resend send OK → to=%s id=%s", recipient, response.json().get("id", ""))
+
+
 async def queue_email(recipient: str, subject: str, body: str, *, audience: str, booking_id: str, locale: str) -> None:
     settings_doc = await get_business_settings()
-    delivery_mode = settings_doc.get("email_mode", "internal_log")
-    if os.environ.get("SMTP_PASSWORD") or os.environ.get("SMTP_USERNAME"):
+    if os.environ.get("RESEND_API_KEY"):
+        delivery_mode = "resend"
+    elif os.environ.get("SMTP_PASSWORD") or os.environ.get("SMTP_USERNAME"):
         delivery_mode = "smtp"
+    else:
+        delivery_mode = settings_doc.get("email_mode", "internal_log")
     delivery_status = "logged"
     delivery_error = ""
 
-    if delivery_mode == "smtp":
+    if delivery_mode == "resend":
+        try:
+            await send_email_via_resend(recipient, subject, body)
+            delivery_status = "sent"
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Resend delivery failed for %s: %s", recipient, exc)
+            delivery_status = "failed"
+            delivery_error = str(exc)
+    elif delivery_mode == "smtp":
         try:
             await send_email_via_smtp(settings_doc, recipient, subject, body)
             delivery_status = "sent"
@@ -1825,9 +1857,11 @@ class TestEmailRequest(BaseModel):
 @api_router.post("/admin/settings/test-email")
 async def test_email_send(payload: TestEmailRequest, _: Dict[str, Any] = Depends(require_role("superadmin"))) -> Dict[str, Any]:
     settings_doc = await get_business_settings()
+    resend_key = os.environ.get("RESEND_API_KEY")
     env_password = os.environ.get("SMTP_PASSWORD")
     smtp_password_encrypted = settings_doc.get("smtp_password_encrypted")
     diag = {
+        "resend_configured": bool(resend_key),
         "email_mode_in_db": settings_doc.get("email_mode", "internal_log"),
         "smtp_host": settings_doc.get("smtp_host", "smtp.gmail.com"),
         "smtp_port": settings_doc.get("smtp_port", 587),
@@ -1837,12 +1871,21 @@ async def test_email_send(payload: TestEmailRequest, _: Dict[str, Any] = Depends
         "smtp_password_in_env": bool(env_password),
     }
     try:
-        await send_email_via_smtp(
-            settings_doc,
-            payload.recipient,
-            "PAWS TRAINING — Test / Prueba",
-            "This is a test email from PAWS TRAINING. SMTP is working.\n\nEste es un email de prueba de PAWS TRAINING. El SMTP funciona correctamente.",
-        )
+        if resend_key:
+            await send_email_via_resend(
+                payload.recipient,
+                "PAWS TRAINING — Test / Prueba",
+                "This is a test email from PAWS TRAINING. Resend is working.\n\nEste es un email de prueba de PAWS TRAINING. Resend funciona correctamente.",
+            )
+            diag["delivery_method"] = "resend"
+        else:
+            await send_email_via_smtp(
+                settings_doc,
+                payload.recipient,
+                "PAWS TRAINING — Test / Prueba",
+                "This is a test email from PAWS TRAINING. SMTP is working.\n\nEste es un email de prueba de PAWS TRAINING. El SMTP funciona correctamente.",
+            )
+            diag["delivery_method"] = "smtp"
         return {"success": True, "diagnostic": diag}
     except Exception as exc:  # noqa: BLE001
         logger.exception("Test email failed → %s", exc)
