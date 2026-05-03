@@ -604,6 +604,7 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
 
 const FinalPaymentPage = ({ language, setLanguage }) => {
   const { token } = useParams();
+  const [searchParams] = useSearchParams();
   const t = translations[language];
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -611,6 +612,7 @@ const FinalPaymentPage = ({ language, setLanguage }) => {
   const [file, setFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [stripeLoading, setStripeLoading] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -644,6 +646,17 @@ const FinalPaymentPage = ({ language, setLanguage }) => {
     }
   };
 
+  const handleStripePayment = async () => {
+    setStripeLoading(true);
+    try {
+      const { url } = await publicApi.createStripeFinalSession(token);
+      window.location.href = url;
+    } catch (err) {
+      toast.error(err.message);
+      setStripeLoading(false);
+    }
+  };
+
   if (loading) return <div className="flex min-h-screen items-center justify-center bg-black text-white">...</div>;
 
   if (error || !booking) {
@@ -657,7 +670,9 @@ const FinalPaymentPage = ({ language, setLanguage }) => {
     );
   }
 
-  const depositNotReady = booking.payment_status !== "Verified";
+  const fullyPaid = booking.final_payment_status === "Verified";
+  const stripeReceived = searchParams.get("stripe_paid") === "true";
+  const depositNotReady = booking.payment_status !== "Verified" && booking.payment_status !== "Paid in Full";
   const alreadyUploaded = booking.final_payment_proof_uploaded;
 
   return (
@@ -687,7 +702,18 @@ const FinalPaymentPage = ({ language, setLanguage }) => {
             </div>
           </div>
 
-          {depositNotReady ? (
+          {fullyPaid ? (
+            <div className="rounded-2xl border border-green-500/20 bg-green-500/10 p-5 text-center text-green-200" data-testid="final-payment-confirmed">
+              <CheckCircle2 className="mx-auto mb-2 h-8 w-8" />
+              <p className="font-semibold">{tt.finalPaymentConfirmed}</p>
+              <p className="mt-1 text-sm text-green-300">{tt.finalPaymentConfirmedBody}</p>
+            </div>
+          ) : stripeReceived ? (
+            <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-5 text-center text-blue-200" data-testid="stripe-processing-message">
+              <CheckCircle2 className="mx-auto mb-2 h-8 w-8" />
+              <p>{tt.finalPaymentProcessing}</p>
+            </div>
+          ) : depositNotReady ? (
             <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-5 text-center text-yellow-200" data-testid="deposit-not-ready-message">
               <AlertTriangle className="mx-auto mb-2 h-8 w-8" />
               <p>{tt.finalPaymentNotReady}</p>
@@ -703,15 +729,22 @@ const FinalPaymentPage = ({ language, setLanguage }) => {
               <p>{tt.finalPaymentSuccess}</p>
             </div>
           ) : (
-            <form className="space-y-4" data-testid="final-payment-form" onSubmit={handleSubmit}>
-              <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4">
-                <p className="mb-3 text-sm text-zinc-300">{tt.finalPaymentUploadLabel}</p>
-                <input accept=".pdf,image/*" data-testid="final-payment-file-input" onChange={(e) => setFile(e.target.files?.[0] || null)} required type="file" />
-              </div>
-              <Button className="w-full rounded-full bg-primary text-white hover:bg-red-700" data-testid="final-payment-submit-button" disabled={submitting || !file} type="submit">
-                {submitting ? "..." : tt.finalPaymentSubmitButton}
-              </Button>
-            </form>
+            <div className="space-y-4">
+              {booking.stripe_enabled && (
+                <Button className="w-full rounded-full bg-primary text-white hover:bg-red-700" data-testid="stripe-pay-balance-button" disabled={stripeLoading} onClick={handleStripePayment} type="button">
+                  {stripeLoading ? tt.finalPaymentStripeRedirecting : tt.finalPaymentPayWithCard}
+                </Button>
+              )}
+              <form className="space-y-4" data-testid="final-payment-form" onSubmit={handleSubmit}>
+                <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4">
+                  <p className="mb-3 text-sm text-zinc-300">{tt.finalPaymentUploadLabel}</p>
+                  <input accept=".pdf,image/*" data-testid="final-payment-file-input" onChange={(e) => setFile(e.target.files?.[0] || null)} required type="file" />
+                </div>
+                <Button className="w-full rounded-full bg-primary text-white hover:bg-red-700" data-testid="final-payment-submit-button" disabled={submitting || !file} type="submit">
+                  {submitting ? "..." : tt.finalPaymentSubmitButton}
+                </Button>
+              </form>
+            </div>
           )}
         </CardContent>
       </Card>
