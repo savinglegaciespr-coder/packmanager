@@ -677,8 +677,10 @@ const FinalPaymentPage = ({ language, setLanguage }) => {
     );
   }
 
-  const fullyPaid = booking.final_payment_status === "Verified";
-  const stripeReceived = searchParams.get("stripe_paid") === "true";
+  const fullyPaid =
+    booking.final_payment_status === "Verified" ||
+    booking.payment_status === "Paid in Full" ||
+    searchParams.get("stripe_paid") === "true";
   const depositNotReady = booking.payment_status !== "Verified" && booking.payment_status !== "Paid in Full";
   const alreadyUploaded = booking.final_payment_proof_uploaded;
 
@@ -714,11 +716,6 @@ const FinalPaymentPage = ({ language, setLanguage }) => {
               <CheckCircle2 className="mx-auto mb-2 h-8 w-8" />
               <p className="font-semibold">{tt.finalPaymentConfirmed}</p>
               <p className="mt-1 text-sm text-green-300">{tt.finalPaymentConfirmedBody}</p>
-            </div>
-          ) : stripeReceived ? (
-            <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-5 text-center text-blue-200" data-testid="stripe-processing-message">
-              <CheckCircle2 className="mx-auto mb-2 h-8 w-8" />
-              <p>{tt.finalPaymentProcessing}</p>
             </div>
           ) : depositNotReady ? (
             <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-5 text-center text-yellow-200" data-testid="deposit-not-ready-message">
