@@ -77,13 +77,6 @@ const LandingPage = ({ config, programs, language, setLanguage, showAdminAccess 
                   {getLocalizedLandingText(landingContent, "reserve_button_label", language, t.reserveSpot)}
                 </Button>
               </Link>
-              {showAdminAccess && (
-                <Link data-testid="hero-admin-link" to="/admin/login">
-                  <Button className="hero-secondary-button rounded-full border border-white/10 bg-transparent text-white hover:bg-white/5" variant="outline">
-                    {getLocalizedLandingText(landingContent, "admin_button_label", language, t.adminLogin)}
-                  </Button>
-                </Link>
-              )}
             </div>
             <div className="hero-feature-grid">
               {landingContent.feature_cards.map((item) => (

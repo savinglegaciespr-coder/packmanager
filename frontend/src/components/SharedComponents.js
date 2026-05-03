@@ -71,11 +71,6 @@ export const PublicHeader = ({ compact = false, config, language, setLanguage, s
           <Link className={`rounded-full transition-colors hover:bg-white/5 ${compact ? "px-2.5 py-1.5 md:px-4 md:py-2" : "px-4 py-2"}`} data-testid="nav-book-link" to="/book">
             {t.booking}
           </Link>
-          {showAdminAccess && (
-            <Link className={`rounded-full transition-colors hover:bg-white/5 ${compact ? "px-2.5 py-1.5 md:px-4 md:py-2" : "px-4 py-2"}`} data-testid="nav-admin-link" to="/admin/login">
-              {t.admin}
-            </Link>
-          )}
         </nav>
         <LanguageToggle language={language} setLanguage={setLanguage} />
       </div>
