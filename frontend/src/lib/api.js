@@ -96,6 +96,14 @@ export const publicApi = {
       return normalizeError(error);
     }
   },
+  async createStripeFinalSession(token) {
+    try {
+      const response = await client.post(`/public/booking-payment/${token}/create-stripe-final-session`);
+      return response.data;
+    } catch (error) {
+      return normalizeError(error);
+    }
+  },
   async submitBooking(formData) {
     try {
       const response = await client.post("/public/bookings", formData, {

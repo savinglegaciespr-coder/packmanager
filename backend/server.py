@@ -953,6 +953,42 @@ async def send_deposit_verified_email(booking: Dict[str, Any]) -> None:
     await queue_email(booking["owner"]["email"], subject, body, audience="client", booking_id=booking["id"], locale=locale)
 
 
+async def send_final_payment_confirmed_emails(booking: Dict[str, Any], settings_doc: Dict[str, Any]) -> None:
+    locale = booking.get("locale", "es")
+    program_name = booking["program_name_en"] if locale == "en" else booking["program_name_es"]
+    price_label = format_money(float(booking.get("program_price", 0)), settings_doc.get("currency", "USD"))
+    intake_week = booking.get("intake_date") or booking.get("start_week", "")
+    if locale == "en":
+        client_subject = "PAWS TRAINING — Payment complete"
+        client_body = (
+            f"Hi {booking['owner']['full_name']},\n\n"
+            f"Your final payment for {booking['dog']['name']} ({program_name}) has been confirmed.\n\n"
+            f"Program: {program_name}\n"
+            f"Intake week: {intake_week}\n"
+            f"Total paid: {price_label}\n\n"
+            f"Thank you for choosing PAWS TRAINING."
+        )
+    else:
+        client_subject = "PAWS TRAINING — Pago completo confirmado"
+        client_body = (
+            f"Hola {booking['owner']['full_name']},\n\n"
+            f"Tu pago final para {booking['dog']['name']} ({program_name}) ha sido confirmado.\n\n"
+            f"Programa: {program_name}\n"
+            f"Semana de ingreso: {intake_week}\n"
+            f"Total pagado: {price_label}\n\n"
+            f"Gracias por confiar en PAWS TRAINING."
+        )
+    admin_subject = f"Pago final recibido — {booking['owner']['full_name']}"
+    admin_body = (
+        f"{booking['owner']['full_name']} ha completado el pago final para {booking['dog']['name']} ({booking['program_name_es']}). "
+        f"Semana de ingreso: {intake_week}. Total: {price_label}. Estado: Paid in Full."
+    )
+    await queue_email(booking["owner"]["email"], client_subject, client_body, audience="client", booking_id=booking["id"], locale=locale)
+    admin_email = settings_doc.get("admin_notification_email", "")
+    if admin_email:
+        await queue_email(admin_email, admin_subject, admin_body, audience="admin", booking_id=booking["id"], locale="es")
+
+
 # --- Public endpoints: token-based final payment upload ---
 
 
@@ -984,6 +1020,7 @@ async def get_booking_by_payment_token(token: str) -> Dict[str, Any]:
         "locale": booking.get("locale", "es"),
         "currency": currency,
         "business_name": settings_doc.get("business_name", "PAWS TRAINING"),
+        "stripe_enabled": bool(settings_doc.get("stripe_onboarding_complete", False)),
     }
 
 
@@ -1008,6 +1045,78 @@ async def upload_final_payment_via_token(token: str, file: UploadFile = File(...
         admin_body = f"{booking['owner']['full_name']} ha subido el comprobante de pago final para {booking['dog']['name']}. Programa: {booking['program_name_es']}. Revisa en el panel de administración."
         await queue_email(admin_email, admin_subject, admin_body, audience="admin", booking_id=booking["id"], locale="es")
     return {"message": "Final payment proof uploaded successfully.", "overall_payment_status": "Balance Pending"}
+
+
+@api_router.post("/public/booking-payment/{token}/create-stripe-final-session")
+async def create_stripe_final_session(token: str) -> Dict[str, Any]:
+    stripe_key = os.environ.get("STRIPE_SECRET_KEY", "")
+    if not stripe_key:
+        raise HTTPException(status_code=503, detail="Stripe not configured.")
+
+    booking = await db.bookings.find_one({"final_payment_token": token}, {"_id": 0})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found or link expired.")
+    if booking.get("payment_status") != "Verified":
+        raise HTTPException(status_code=400, detail="Deposit must be verified before paying the balance.")
+    if booking.get("final_payment_status") == "Verified":
+        raise HTTPException(status_code=400, detail="Final payment already completed.")
+
+    stripe.api_key = stripe_key
+    existing_session_id = booking.get("stripe_final_session_id")
+    if existing_session_id:
+        try:
+            existing = await asyncio.to_thread(stripe.checkout.Session.retrieve, existing_session_id)
+            if existing.status == "open":
+                return {"url": existing.url}
+        except Exception:
+            pass
+
+    settings_doc = await get_business_settings()
+    connected_account_id = settings_doc.get("stripe_account_id", "")
+    if not connected_account_id:
+        raise HTTPException(status_code=503, detail="Stripe Connect account not configured.")
+
+    price = float(booking.get("program_price", 0))
+    snapshot = booking.get("program_snapshot") or {}
+    amounts = compute_deposit_amounts(price, snapshot.get("deposit_type", "percentage"), snapshot.get("deposit_value", 100.0))
+    balance_cents = int(round(amounts["balance_amount"] * 100))
+    if balance_cents <= 0:
+        raise HTTPException(status_code=400, detail="No balance remaining.")
+
+    currency = settings_doc.get("currency", "USD").lower()
+    product_name = booking.get("program_name_es") or booking.get("program_name_en") or "Pago final"
+    owner_email = booking.get("owner", {}).get("email") or None
+    platform_fee_cents = max(1, int(round(balance_cents * 0.006)))
+    booking_id = booking["id"]
+    frontend_url = os.environ.get("FRONTEND_URL", "https://frontend-production-d4977.up.railway.app")
+
+    session = await asyncio.to_thread(
+        stripe.checkout.Session.create,
+        payment_method_types=["card"],
+        line_items=[{
+            "price_data": {
+                "currency": currency,
+                "product_data": {"name": f"{product_name} — Saldo final"},
+                "unit_amount": balance_cents,
+            },
+            "quantity": 1,
+        }],
+        mode="payment",
+        success_url=f"{frontend_url}/payment/{token}?stripe_paid=true",
+        cancel_url=f"{frontend_url}/payment/{token}",
+        customer_email=owner_email,
+        metadata={"booking_id": booking_id, "payment_type": "final"},
+        payment_intent_data={
+            "application_fee_amount": platform_fee_cents,
+            "transfer_data": {"destination": connected_account_id},
+        },
+    )
+
+    await db.bookings.update_one(
+        {"id": booking_id},
+        {"$set": {"stripe_final_session_id": session.id, "updated_at": iso_now()}}
+    )
+    return {"url": session.url}
 
 
 async def build_dashboard_payload() -> Dict[str, Any]:
@@ -1925,16 +2034,35 @@ async def stripe_webhook(request: Request):
 
     if event.get("type") == "checkout.session.completed":
         session_data = event["data"]["object"]
-        booking_id = (session_data.get("metadata") or {}).get("booking_id")
+        metadata = session_data.get("metadata") or {}
+        booking_id = metadata.get("booking_id")
+        payment_type = metadata.get("payment_type", "deposit")
+
         if booking_id:
-            await db.bookings.update_one(
-                {"id": booking_id},
-                {"$set": {
-                    "stripe_payment_status": "paid",
-                    "payment_status": "Pending Review",
-                    "updated_at": iso_now(),
-                }}
-            )
+            if payment_type == "final":
+                booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
+                if booking and booking.get("final_payment_status") != "Verified":
+                    settings_doc = await get_business_settings()
+                    await db.bookings.update_one(
+                        {"id": booking_id},
+                        {"$set": {
+                            "final_payment_status": "Verified",
+                            "payment_status": "Paid in Full",
+                            "stripe_final_payment_status": "paid",
+                            "updated_at": iso_now(),
+                        }}
+                    )
+                    updated_booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
+                    await send_final_payment_confirmed_emails(updated_booking, settings_doc)
+            else:
+                await db.bookings.update_one(
+                    {"id": booking_id},
+                    {"$set": {
+                        "stripe_payment_status": "paid",
+                        "payment_status": "Pending Review",
+                        "updated_at": iso_now(),
+                    }}
+                )
 
     return {"ok": True}
 
