@@ -1015,10 +1015,14 @@ async def send_final_payment_confirmed_emails(booking: Dict[str, Any], settings_
         f"{booking['owner']['full_name']} ha completado el pago final para {booking['dog']['name']} ({booking['program_name_es']}). "
         f"Semana de ingreso: {intake_week}. Total: {price_label}. Estado: Paid in Full."
     )
-    await queue_email(booking["owner"]["email"], client_subject, client_body, audience="client", booking_id=booking["id"], locale=locale)
+    client_email = booking["owner"]["email"]
     admin_email = settings_doc.get("admin_notification_email", "")
+    logger.info("FINAL PAYMENT EMAILS QUEUED: booking_id=%s client=%s admin=%s", booking["id"], client_email, admin_email or "(none)")
+    await queue_email(client_email, client_subject, client_body, audience="client", booking_id=booking["id"], locale=locale)
     if admin_email:
         await queue_email(admin_email, admin_subject, admin_body, audience="admin", booking_id=booking["id"], locale="es")
+    else:
+        logger.warning("FINAL PAYMENT EMAIL: no admin_notification_email configured, skipping admin email — booking_id=%s", booking["id"])
 
 
 # --- Public endpoints: token-based final payment upload ---
@@ -2075,16 +2079,28 @@ async def stripe_webhook(request: Request):
         except Exception:
             raise HTTPException(status_code=400, detail="Invalid payload.")
 
-    if event.get("type") == "checkout.session.completed":
+    event_type = event.get("type")
+    logger.info("STRIPE WEBHOOK RECEIVED: type=%s", event_type)
+
+    if event_type == "checkout.session.completed":
         session_data = event["data"]["object"]
         metadata = session_data.get("metadata") or {}
         booking_id = metadata.get("booking_id")
         payment_type = metadata.get("payment_type", "deposit")
 
+        logger.info("STRIPE WEBHOOK checkout.session.completed: booking_id=%s payment_type=%s", booking_id, payment_type)
+
         if booking_id:
             if payment_type == "final":
+                logger.info("FINAL PAYMENT WEBHOOK RECEIVED: booking_id=%s", booking_id)
                 booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
-                if booking and booking.get("final_payment_status") != "Verified":
+
+                if not booking:
+                    logger.error("FINAL PAYMENT WEBHOOK: booking not found — booking_id=%s", booking_id)
+                elif booking.get("final_payment_status") == "Verified":
+                    logger.info("FINAL PAYMENT WEBHOOK: already verified, skipping (idempotent) — booking_id=%s", booking_id)
+                else:
+                    logger.info("FINAL PAYMENT BOOKING FOUND: booking_id=%s owner=%s", booking_id, booking.get("owner", {}).get("full_name", "?"))
                     settings_doc = await get_business_settings()
                     await db.bookings.update_one(
                         {"id": booking_id},
@@ -2096,7 +2112,14 @@ async def stripe_webhook(request: Request):
                         }}
                     )
                     updated_booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
-                    await send_final_payment_confirmed_emails(updated_booking, settings_doc)
+                    if not updated_booking:
+                        logger.error("FINAL PAYMENT WEBHOOK: booking disappeared after update — booking_id=%s", booking_id)
+                    else:
+                        try:
+                            await send_final_payment_confirmed_emails(updated_booking, settings_doc)
+                            logger.info("FINAL PAYMENT EMAILS QUEUED: booking_id=%s", booking_id)
+                        except Exception as exc:  # noqa: BLE001
+                            logger.exception("FINAL PAYMENT EMAIL ERROR: booking_id=%s error=%s", booking_id, exc)
             else:
                 await db.bookings.update_one(
                     {"id": booking_id},
