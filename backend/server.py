@@ -70,7 +70,8 @@ VALID_BOOKING_STATUSES = {
 }
 ACTIVE_CAPACITY_STATUSES = {"Pending Review", "Approved", "Scheduled", "In Training", "Delivered"}
 CONFIRMED_CAPACITY_STATUSES = {"Approved", "Scheduled", "In Training", "Delivered"}
-DOC_STATUS_VALUES = {"Pending Review", "Verified", "Invalid"}
+DOC_STATUS_VALUES = {"Pending Review", "Verified", "Deposit Paid", "Invalid"}
+DEPOSIT_PAID_STATES = {"Verified", "Deposit Paid", "Paid in Full"}
 ELIGIBILITY_VALUES = {"Pending Review", "Eligible", "Ineligible"}
 ALLOWED_UPLOAD_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".webp", ".heic", ".heif"}
 CURRENCY_OPTIONS = {
@@ -327,9 +328,9 @@ def compute_deposit_amounts(program_price: float, deposit_type: str, deposit_val
 def compute_overall_payment_status(booking_doc: Dict[str, Any]) -> str:
     deposit = booking_doc.get("payment_status", "Pending Review")
     final = booking_doc.get("final_payment_status", "Pending Review")
-    if deposit != "Verified":
+    if deposit not in DEPOSIT_PAID_STATES:
         return "Deposit Pending"
-    if final == "Verified":
+    if deposit == "Paid in Full" or final == "Verified":
         return "Paid in Full"
     if booking_doc.get("final_payment_proof"):
         return "Balance Pending"
@@ -363,7 +364,7 @@ OPERATOR_ALLOWED_UPDATE_FIELDS = {"status"}
 def sanitize_booking_for_operator(booking: Dict[str, Any]) -> Dict[str, Any]:
     result = {k: v for k, v in booking.items() if k not in OPERATOR_FINANCIAL_FIELDS}
     if "payment_status" in result:
-        result["payment_status"] = "Paid" if result["payment_status"] == "Verified" else "Pending"
+        result["payment_status"] = "Paid" if result["payment_status"] in DEPOSIT_PAID_STATES else "Pending"
     if "final_payment_status" in result:
         result["final_payment_status"] = "Paid" if result["final_payment_status"] == "Verified" else "Pending"
     return result
@@ -607,6 +608,16 @@ async def ensure_seed_data() -> None:
         await db.bookings.update_one(
             {"id": b["id"]},
             {"$set": {"final_payment_token": secrets.token_urlsafe(32)}},
+        )
+
+    # Backfill deposit_payment_token for bookings that lack it
+    bookings_without_deposit_token = await db.bookings.find(
+        {"deposit_payment_token": {"$exists": False}}, {"_id": 0, "id": 1}
+    ).to_list(5000)
+    for b in bookings_without_deposit_token:
+        await db.bookings.update_one(
+            {"id": b["id"]},
+            {"$set": {"deposit_payment_token": secrets.token_urlsafe(32)}},
         )
 
 
@@ -915,14 +926,51 @@ async def send_approval_email(booking: Dict[str, Any]) -> None:
     locale = booking.get("locale", "es")
     intake_week = booking.get("intake_date") or booking["start_week"]
     settings_doc = await get_business_settings()
-    price_label = format_money(float(booking.get("program_price", 0)), settings_doc.get("currency", "USD"))
+    currency = settings_doc.get("currency", "USD")
+    price_label = format_money(float(booking.get("program_price", 0)), currency)
     program_name = booking["program_name_en"] if locale == "en" else booking["program_name_es"]
+
+    token = booking.get("deposit_payment_token", "")
+    frontend_url = os.environ.get("FRONTEND_URL", "")
+    if not frontend_url:
+        frontend_url = settings_doc.get("site_url", settings_doc.get("frontend_url", ""))
+    deposit_link = f"{frontend_url}/deposit/{token}" if token else ""
+
+    snapshot = booking.get("program_snapshot") or {}
+    price = float(booking.get("program_price", 0))
+    amounts = compute_deposit_amounts(price, snapshot.get("deposit_type", "percentage"), snapshot.get("deposit_value", 100.0))
+    deposit_label = format_money(amounts["deposit_amount"], currency)
+
     if locale == "en":
-        subject = "PAWS TRAINING — Booking approved"
-        body = f"Hi {booking['owner']['full_name']}, your booking for {booking['dog']['name']} ({program_name}) has been approved. Program total: {price_label}. Intake week: {intake_week}."
+        subject = "PAWS TRAINING — Booking approved — Pay your deposit now"
+        body = (
+            f"Hi {booking['owner']['full_name']},\n\n"
+            f"Great news! Your booking for {booking['dog']['name']} in the {program_name} has been approved.\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"  ACTION REQUIRED: PAY YOUR DEPOSIT\n"
+            f"  Deposit amount: {deposit_label}\n"
+            f"  {deposit_link}\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"Your spot will be confirmed once we receive your deposit.\n"
+            f"After your deposit is processed you will receive a separate link to pay the remaining balance.\n\n"
+            f"Intake week: {intake_week}  ·  Program total: {price_label}\n\n"
+            f"Thank you for choosing PAWS TRAINING."
+        )
     else:
-        subject = "PAWS TRAINING — Reserva aprobada"
-        body = f"Hola {booking['owner']['full_name']}, la reserva para {booking['dog']['name']} ({program_name}) fue aprobada. Importe del programa: {price_label}. Semana de ingreso: {intake_week}."
+        subject = "PAWS TRAINING — Reserva aprobada — Paga tu depósito ahora"
+        body = (
+            f"¡Buenas noticias, {booking['owner']['full_name']}!\n\n"
+            f"Tu reserva para {booking['dog']['name']} en el programa {program_name} ha sido aprobada.\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"  ACCIÓN REQUERIDA: PAGA TU DEPÓSITO\n"
+            f"  Importe del depósito: {deposit_label}\n"
+            f"  {deposit_link}\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"Tu plaza queda confirmada en cuanto recibamos tu depósito.\n"
+            f"Una vez procesado recibirás un enlace separado para pagar el saldo restante.\n\n"
+            f"Semana de ingreso: {intake_week}  ·  Total del programa: {price_label}\n\n"
+            f"Gracias por confiar en PAWS TRAINING."
+        )
     await queue_email(booking["owner"]["email"], subject, body, audience="client", booking_id=booking["id"], locale=locale)
 
 
@@ -1067,8 +1115,8 @@ async def upload_final_payment_via_token(token: str, file: UploadFile = File(...
         raise HTTPException(status_code=404, detail="Booking not found or link expired.")
     if booking.get("final_payment_proof"):
         raise HTTPException(status_code=400, detail="Final payment proof has already been uploaded.")
-    if booking.get("payment_status") != "Verified":
-        raise HTTPException(status_code=400, detail="Deposit must be verified before uploading final payment.")
+    if booking.get("payment_status") not in DEPOSIT_PAID_STATES:
+        raise HTTPException(status_code=400, detail="Deposit must be paid before uploading final payment.")
     file_info = await save_upload(file, booking["id"], "final-payment-proof")
     await db.bookings.update_one(
         {"id": booking["id"]},
@@ -1092,8 +1140,8 @@ async def create_stripe_final_session(token: str) -> Dict[str, Any]:
     booking = await db.bookings.find_one({"final_payment_token": token}, {"_id": 0})
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found or link expired.")
-    if booking.get("payment_status") != "Verified":
-        raise HTTPException(status_code=400, detail="Deposit must be verified before paying the balance.")
+    if booking.get("payment_status") not in DEPOSIT_PAID_STATES:
+        raise HTTPException(status_code=400, detail="Deposit must be paid before paying the balance.")
     if booking.get("final_payment_status") == "Verified":
         raise HTTPException(status_code=400, detail="Final payment already completed.")
 
@@ -1155,6 +1203,107 @@ async def create_stripe_final_session(token: str) -> Dict[str, Any]:
     return {"url": session.url}
 
 
+@api_router.get("/public/booking-deposit/{token}")
+async def get_booking_by_deposit_token(token: str) -> Dict[str, Any]:
+    booking = await db.bookings.find_one({"deposit_payment_token": token}, {"_id": 0})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found or link expired.")
+    settings_doc = await get_business_settings()
+    currency = settings_doc.get("currency", "USD")
+    price = float(booking.get("program_price", 0))
+    snapshot = booking.get("program_snapshot") or {}
+    amounts = compute_deposit_amounts(price, snapshot.get("deposit_type", "percentage"), snapshot.get("deposit_value", 100.0))
+    return {
+        "booking_id": booking["id"],
+        "owner_name": booking["owner"]["full_name"],
+        "dog_name": booking["dog"]["name"],
+        "program_name_es": booking["program_name_es"],
+        "program_name_en": booking["program_name_en"],
+        "program_price": price,
+        "deposit_amount": amounts["deposit_amount"],
+        "balance_amount": amounts["balance_amount"],
+        "start_week": booking["start_week"],
+        "status": booking["status"],
+        "payment_status": booking.get("payment_status", "Pending Review"),
+        "locale": booking.get("locale", "es"),
+        "currency": currency,
+        "business_name": settings_doc.get("business_name", "PAWS TRAINING"),
+        "stripe_enabled": bool(settings_doc.get("stripe_onboarding_complete", False)),
+    }
+
+
+@api_router.post("/public/booking-deposit/{token}/create-stripe-session")
+async def create_stripe_deposit_session(token: str) -> Dict[str, Any]:
+    stripe_key = os.environ.get("STRIPE_SECRET_KEY", "")
+    if not stripe_key:
+        raise HTTPException(status_code=503, detail="Stripe not configured.")
+
+    booking = await db.bookings.find_one({"deposit_payment_token": token}, {"_id": 0})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found or link expired.")
+    if booking.get("payment_status") in DEPOSIT_PAID_STATES:
+        raise HTTPException(status_code=400, detail="Deposit already paid.")
+    if booking.get("status") not in {"Approved", "Scheduled", "In Training"}:
+        raise HTTPException(status_code=400, detail="Booking must be approved before paying the deposit.")
+
+    stripe.api_key = stripe_key
+    existing_session_id = booking.get("stripe_deposit_session_id")
+    if existing_session_id:
+        try:
+            existing = await asyncio.to_thread(stripe.checkout.Session.retrieve, existing_session_id)
+            if existing.status == "open":
+                return {"url": existing.url}
+        except Exception:
+            pass
+
+    settings_doc = await get_business_settings()
+    connected_account_id = settings_doc.get("stripe_account_id", "")
+    if not connected_account_id:
+        raise HTTPException(status_code=503, detail="Stripe Connect account not configured.")
+
+    price = float(booking.get("program_price", 0))
+    snapshot = booking.get("program_snapshot") or {}
+    amounts = compute_deposit_amounts(price, snapshot.get("deposit_type", "percentage"), snapshot.get("deposit_value", 100.0))
+    deposit_cents = int(round(amounts["deposit_amount"] * 100))
+    if deposit_cents <= 0:
+        raise HTTPException(status_code=400, detail="Invalid deposit amount.")
+
+    currency = settings_doc.get("currency", "USD").lower()
+    product_name = booking.get("program_name_es") or booking.get("program_name_en") or "Depósito"
+    owner_email = booking.get("owner", {}).get("email") or None
+    platform_fee_cents = max(1, int(round(deposit_cents * 0.006)))
+    booking_id = booking["id"]
+    frontend_url = os.environ.get("FRONTEND_URL", "https://frontend-production-d4977.up.railway.app")
+
+    session = await asyncio.to_thread(
+        stripe.checkout.Session.create,
+        payment_method_types=["card"],
+        line_items=[{
+            "price_data": {
+                "currency": currency,
+                "product_data": {"name": f"{product_name} — Depósito"},
+                "unit_amount": deposit_cents,
+            },
+            "quantity": 1,
+        }],
+        mode="payment",
+        success_url=f"{frontend_url}/deposit/{token}?stripe_paid=true",
+        cancel_url=f"{frontend_url}/deposit/{token}?stripe_cancel=true",
+        customer_email=owner_email,
+        metadata={"booking_id": booking_id, "payment_type": "deposit"},
+        payment_intent_data={
+            "application_fee_amount": platform_fee_cents,
+            "transfer_data": {"destination": connected_account_id},
+        },
+    )
+
+    await db.bookings.update_one(
+        {"id": booking_id},
+        {"$set": {"stripe_deposit_session_id": session.id, "updated_at": iso_now()}}
+    )
+    return {"url": session.url}
+
+
 async def build_dashboard_payload() -> Dict[str, Any]:
     await expire_stale_bookings()
     bookings = [sanitize_booking(item) for item in await db.bookings.find({}, {"_id": 0}).to_list(2000)]
@@ -1192,7 +1341,7 @@ async def build_dashboard_payload() -> Dict[str, Any]:
 
         if booking["payment_status"] == "Pending Review":
             pending_payments += 1
-        if booking["payment_status"] == "Verified":
+        if booking["payment_status"] in DEPOSIT_PAID_STATES:
             confirmed_payments += 1
         overall_ps = booking.get("overall_payment_status", "Deposit Pending")
         if overall_ps == "Deposit Pending":
@@ -1211,14 +1360,14 @@ async def build_dashboard_payload() -> Dict[str, Any]:
             total_deposit_expected += amounts["deposit_amount"]
             total_balance_expected += amounts["balance_amount"]
             payment_summary.setdefault(month_key, {"deposits": 0.0, "final_payments": 0.0, "outstanding": 0.0})
-            if booking.get("payment_status") == "Verified":
+            if booking.get("payment_status") in DEPOSIT_PAID_STATES:
                 total_deposit_collected += amounts["deposit_amount"]
                 payment_summary[month_key]["deposits"] += amounts["deposit_amount"]
             if booking.get("final_payment_status") == "Verified":
                 total_balance_collected += amounts["balance_amount"]
                 payment_summary[month_key]["final_payments"] += amounts["balance_amount"]
             outstanding = 0.0
-            if booking.get("payment_status") != "Verified":
+            if booking.get("payment_status") not in DEPOSIT_PAID_STATES:
                 outstanding += amounts["deposit_amount"]
             if booking.get("final_payment_status") != "Verified":
                 outstanding += amounts["balance_amount"]
@@ -1507,13 +1656,8 @@ async def create_public_booking(
     behavior_goals: str = Form(...),
     current_medication: str = Form(""),
     additional_notes: str = Form(""),
-    payment_method: str = Form("manual"),
-    payment_proof: Optional[UploadFile] = File(None),
     vaccination_certificate: UploadFile = File(...),
 ) -> Dict[str, Any]:
-    if payment_method not in {"manual", "stripe"}:
-        raise HTTPException(status_code=400, detail="Invalid payment method.")
-
     program = await get_active_program(program_id)
     span_weeks = get_program_span_weeks(program)
     normalized_start = parse_week_start(start_week).isoformat()
@@ -1521,14 +1665,8 @@ async def create_public_booking(
 
     booking_id = str(uuid.uuid4())
     final_payment_token = secrets.token_urlsafe(32)
-    
-    if payment_method == "manual":
-        if not payment_proof:
-            raise HTTPException(status_code=400, detail="Payment proof is required for manual payments.")
-        payment_file = await save_upload(payment_proof, booking_id, "payment-proof")
-    else:
-        payment_file = None
-        
+    deposit_payment_token = secrets.token_urlsafe(32)
+
     certificate_file = await save_upload(vaccination_certificate, booking_id, "vaccination-certificate")
     now = iso_now()
     booking_doc = {
@@ -1565,11 +1703,9 @@ async def create_public_booking(
             "current_medication": current_medication,
             "additional_notes": additional_notes,
         },
-        "payment_method": payment_method,
-        "payment_stage": "deposit",
-        "stripe_session_id": None,
+        "payment_method": "none",
         "stripe_payment_status": None,
-        "payment_proof": payment_file,
+        "payment_proof": None,
         "vaccination_certificate": certificate_file,
         "payment_status": "Pending Review",
         "final_payment_proof": None,
@@ -1585,6 +1721,7 @@ async def create_public_booking(
         "updated_at": now,
         "approved_at": None,
         "final_payment_token": final_payment_token,
+        "deposit_payment_token": deposit_payment_token,
         "request_source": str(request.client.host) if request.client else "unknown",
     }
     await db.bookings.insert_one(booking_doc.copy())
@@ -1764,8 +1901,8 @@ async def update_booking(booking_id: str, payload: BookingUpdateRequest, admin: 
     eligibility_status = updates.get("eligibility_status", booking.get("eligibility_status"))
 
     if new_status == "Approved":
-        if payment_status != "Verified" or vaccination_status_value != "Verified" or eligibility_status != "Eligible":
-            raise HTTPException(status_code=400, detail="Payment, vaccination certificate, and eligibility must all be verified before approval.")
+        if vaccination_status_value != "Verified" or eligibility_status != "Eligible":
+            raise HTTPException(status_code=400, detail="Vaccination certificate and eligibility must be verified before approval.")
         updates["approved_at"] = booking.get("approved_at") or iso_now()
         updates["reservation_expires_at"] = None
 
@@ -1786,7 +1923,7 @@ async def update_booking(booking_id: str, payload: BookingUpdateRequest, admin: 
 
     old_deposit = booking.get("payment_status", "Pending Review")
     new_deposit = updated_booking.get("payment_status", "Pending Review")
-    if old_deposit != "Verified" and new_deposit == "Verified":
+    if old_deposit not in DEPOSIT_PAID_STATES and new_deposit in {"Verified", "Deposit Paid"}:
         await send_deposit_verified_email(updated_booking)
 
     return sanitize_booking(updated_booking)
@@ -1860,6 +1997,7 @@ async def create_manual_booking(payload: ManualBookingCreate, _: Dict[str, Any] 
         "updated_at": now,
         "approved_at": now if payload.status in {"Approved", "Scheduled", "In Training", "Delivered"} else None,
         "final_payment_token": secrets.token_urlsafe(32),
+        "deposit_payment_token": secrets.token_urlsafe(32),
     }
     await db.bookings.insert_one(booking_doc.copy())
     return sanitize_booking(booking_doc)
@@ -2121,14 +2259,41 @@ async def stripe_webhook(request: Request):
                         except Exception as exc:  # noqa: BLE001
                             logger.exception("FINAL PAYMENT EMAIL ERROR: booking_id=%s error=%s", booking_id, exc)
             else:
-                await db.bookings.update_one(
-                    {"id": booking_id},
-                    {"$set": {
-                        "stripe_payment_status": "paid",
-                        "payment_status": "Pending Review",
-                        "updated_at": iso_now(),
-                    }}
-                )
+                logger.info("DEPOSIT PAYMENT WEBHOOK RECEIVED: booking_id=%s", booking_id)
+                booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
+                if not booking:
+                    logger.error("DEPOSIT PAYMENT WEBHOOK: booking not found — booking_id=%s", booking_id)
+                elif booking.get("payment_status") in DEPOSIT_PAID_STATES:
+                    logger.info("DEPOSIT PAYMENT WEBHOOK: already processed, skipping (idempotent) — booking_id=%s payment_status=%s", booking_id, booking.get("payment_status"))
+                else:
+                    logger.info("DEPOSIT PAYMENT BOOKING FOUND: booking_id=%s owner=%s", booking_id, booking.get("owner", {}).get("full_name", "?"))
+                    await db.bookings.update_one(
+                        {"id": booking_id},
+                        {"$set": {
+                            "stripe_payment_status": "paid",
+                            "payment_status": "Deposit Paid",
+                            "updated_at": iso_now(),
+                        }}
+                    )
+                    updated_booking = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
+                    if not updated_booking:
+                        logger.error("DEPOSIT PAYMENT WEBHOOK: booking disappeared after update — booking_id=%s", booking_id)
+                    else:
+                        try:
+                            settings_doc = await get_business_settings()
+                            await send_deposit_verified_email(updated_booking)
+                            admin_email = settings_doc.get("admin_notification_email", "")
+                            if admin_email:
+                                admin_subject = f"Depósito recibido — {updated_booking['owner']['full_name']}"
+                                admin_body = (
+                                    f"{updated_booking['owner']['full_name']} ha pagado el depósito para "
+                                    f"{updated_booking['dog']['name']} ({updated_booking['program_name_es']}). "
+                                    f"Semana de inicio: {updated_booking['start_week']}. Estado: Deposit Paid."
+                                )
+                                await queue_email(admin_email, admin_subject, admin_body, audience="admin", booking_id=booking_id, locale="es")
+                            logger.info("DEPOSIT PAYMENT EMAILS QUEUED: booking_id=%s", booking_id)
+                        except Exception as exc:
+                            logger.exception("DEPOSIT PAYMENT EMAIL ERROR: booking_id=%s error=%s", booking_id, exc)
 
     return {"ok": True}
 

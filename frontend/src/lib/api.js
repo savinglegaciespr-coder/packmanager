@@ -84,6 +84,22 @@ export const publicApi = {
       return normalizeError(error);
     }
   },
+  async getBookingByDepositToken(token) {
+    try {
+      const response = await client.get(`/public/booking-deposit/${token}`);
+      return response.data;
+    } catch (error) {
+      return normalizeError(error);
+    }
+  },
+  async createStripeDepositSession(token) {
+    try {
+      const response = await client.post(`/public/booking-deposit/${token}/create-stripe-session`);
+      return response.data;
+    } catch (error) {
+      return normalizeError(error);
+    }
+  },
   async uploadFinalPaymentByToken(token, file) {
     const formData = new FormData();
     formData.append("file", file);

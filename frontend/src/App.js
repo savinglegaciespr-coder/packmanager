@@ -194,17 +194,11 @@ const LandingPage = ({ config, programs, language, setLanguage, showAdminAccess 
 const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess }) => {
   const t = translations[language];
   const currencyCode = config?.currency || "USD";
-  const [searchParams] = useSearchParams();
-  const [paymentMethod, setPaymentMethod] = useState("manual");
   const [selectedProgramId, setSelectedProgramId] = useState(programs[0]?.id || "");
   const [weeks, setWeeks] = useState([]);
   const [loadingWeeks, setLoadingWeeks] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [bookingResult, setBookingResult] = useState(() =>
-    searchParams.get("stripe_success") === "true" && searchParams.get("booking_id")
-      ? { booking_id: searchParams.get("booking_id"), reservation_expires_at: null, stripe: true }
-      : null
-  );
+  const [bookingResult, setBookingResult] = useState(null);
   const [formState, setFormState] = useState({
     locale: language,
     owner_full_name: "",
@@ -223,7 +217,6 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
     current_medication: "",
     additional_notes: "",
     start_week: "",
-    payment_proof: null,
     vaccination_certificate: null,
     accept_deposit_policy: false,
   });
@@ -276,12 +269,6 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
 
   useEffect(() => { loadWeeks(); }, [loadWeeks]);
 
-  useEffect(() => {
-    if (searchParams.get("stripe_cancel") === "true") {
-      toast.error(language === "es" ? "Pago cancelado. Puedes intentarlo de nuevo." : "Payment cancelled. You can try again.");
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const updateField = (name, value) => setFormState((current) => ({ ...current, [name]: value }));
 
@@ -299,8 +286,8 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
       toast.error(t.invalidDogBirthDate);
       return;
     }
-    if ((paymentMethod === "manual" && !formState.payment_proof) || !formState.vaccination_certificate) {
-      toast.error(language === "es" ? "Debes cargar todos los documentos requeridos." : "Please upload all required documents.");
+    if (!formState.vaccination_certificate) {
+      toast.error(language === "es" ? "Debes cargar el certificado de vacunación." : "Please upload the vaccination certificate.");
       return;
     }
     if (!formState.accept_deposit_policy) {
@@ -311,9 +298,8 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
     try {
       const payload = new FormData();
       payload.append("program_id", selectedProgramId);
-      payload.append("payment_method", paymentMethod);
       Object.entries(formState).forEach(([key, value]) => {
-        if (key !== "confirm_email" && value !== null && value !== undefined) {
+        if (key !== "confirm_email" && key !== "accept_deposit_policy" && value !== null && value !== undefined) {
           payload.append(key, value);
         }
       });
@@ -321,11 +307,6 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
       payload.append("date_of_birth", normalizedDogBirthDate);
       payload.append("age", computedDogAge);
       const response = await publicApi.submitBooking(payload);
-      if (paymentMethod === "stripe") {
-        const { url } = await publicApi.createStripeSession(response.booking_id);
-        window.location.href = url;
-        return;
-      }
       setBookingResult(response);
       toast.success(t.bookingSubmitted);
       setFormState((current) => ({
@@ -333,7 +314,7 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
         owner_full_name: "", owner_email: "", confirm_email: "", owner_phone: "",
         owner_address: "", dog_name: "", breed: "", weight: "", date_of_birth_input: "",
         vaccination_status: t.yes, allergies: "", behavior_goals: "",
-        current_medication: "", additional_notes: "", payment_proof: null, vaccination_certificate: null,
+        current_medication: "", additional_notes: "", vaccination_certificate: null,
       }));
       await loadWeeks();
     } catch (error) {
@@ -342,8 +323,6 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
       setSubmitting(false);
     }
   };
-
-  console.log("BookingPage config stripe_enabled:", config?.stripe_enabled);
 
   return (
     <div className="app-shell" data-testid="booking-page">
@@ -474,25 +453,19 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
               <div className="rounded-2xl border border-green-500/20 bg-green-500/10 p-4 text-sm text-green-100" data-testid="booking-success-panel">
                 <p className="font-semibold">{t.bookingSubmitted}</p>
                 <p className="mt-2">ID: {bookingResult.booking_id}</p>
-                {bookingResult.stripe ? (
-                  <p className="mt-2 font-medium">
-                    {language === "es"
-                      ? "✅ Pago con tarjeta completado. Recibirás una confirmación por correo."
-                      : "✅ Card payment completed. You will receive a confirmation by email."}
-                  </p>
-                ) : (
-                  <>
-                    <p className="mt-1">{t.reservationSummaryPrice}: {formatCurrency(selectedProgram?.price, language, currencyCode)}</p>
-                    {selectedProgram && (() => {
-                      const depType = selectedProgram.deposit_type || "percentage";
-                      const depVal = selectedProgram.deposit_value ?? 100;
-                      const dep = depType === "fixed" ? Math.min(depVal, selectedProgram.price) : Math.round(selectedProgram.price * depVal / 100 * 100) / 100;
-                      const bal = Math.round((selectedProgram.price - dep) * 100) / 100;
-                      return <p className="mt-1">{t.depositLabel}: {formatCurrency(dep, language, currencyCode)} · {t.balanceLabel}: {formatCurrency(bal, language, currencyCode)}</p>;
-                    })()}
-                    <p className="mt-1">{t.reservationHeldUntil}: {bookingResult.reservation_expires_at}</p>
-                  </>
-                )}
+                <p className="mt-1">{t.reservationSummaryPrice}: {formatCurrency(selectedProgram?.price, language, currencyCode)}</p>
+                {selectedProgram && (() => {
+                  const depType = selectedProgram.deposit_type || "percentage";
+                  const depVal = selectedProgram.deposit_value ?? 100;
+                  const dep = depType === "fixed" ? Math.min(depVal, selectedProgram.price) : Math.round(selectedProgram.price * depVal / 100 * 100) / 100;
+                  const bal = Math.round((selectedProgram.price - dep) * 100) / 100;
+                  return <p className="mt-1">{t.depositLabel}: {formatCurrency(dep, language, currencyCode)} · {t.balanceLabel}: {formatCurrency(bal, language, currencyCode)}</p>;
+                })()}
+                <p className="mt-2 text-green-200">
+                  {language === "es"
+                    ? "Nuestro equipo revisará tu solicitud y te enviará el enlace de pago del depósito por correo."
+                    : "Our team will review your application and send you the deposit payment link by email."}
+                </p>
               </div>
             )}
           </CardContent>
@@ -504,23 +477,6 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
           </CardHeader>
           <CardContent>
             <form className="grid gap-6" onSubmit={handleSubmit}>
-              <div className="space-y-3" data-testid="payment-method-selector">
-                <p className="text-sm text-zinc-300">Método de pago</p>
-                <div className="flex gap-3">
-                  <button type="button"
-                    onClick={() => setPaymentMethod("manual")}
-                    className={paymentMethod === "manual" ? "bg-red-600 text-white px-4 py-2 rounded" : "bg-zinc-800 text-white px-4 py-2 rounded"}>
-                    Manual
-                  </button>
-                  {config?.stripe_enabled && (
-                    <button type="button"
-                      onClick={() => setPaymentMethod("stripe")}
-                      className={paymentMethod === "stripe" ? "bg-red-600 text-white px-4 py-2 rounded" : "bg-zinc-800 text-white px-4 py-2 rounded"}>
-                      Tarjeta
-                    </button>
-                  )}
-                </div>
-              </div>
               <section className="grid gap-4 md:grid-cols-2">
                 <div className="md:col-span-2">
                   <p className="mb-2 text-sm uppercase tracking-[0.2em] text-zinc-500">{t.ownerInformation}</p>
@@ -567,16 +523,10 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
                 <Input data-testid="dog-notes-input" onChange={(event) => updateField("additional_notes", event.target.value)} placeholder={t.notes} value={formState.additional_notes} />
               </section>
 
-              <section className="grid gap-4 md:grid-cols-2">
-                <div className="md:col-span-2">
+              <section className="grid gap-4">
+                <div>
                   <p className="mb-2 text-sm uppercase tracking-[0.2em] text-zinc-500">{t.documents}</p>
                 </div>
-                {paymentMethod === "manual" && (
-                  <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4">
-                    <p className="mb-3 text-sm text-zinc-300">{t.paymentProof}</p>
-                    <input accept=".pdf,image/*" data-testid="payment-proof-input" onChange={(event) => updateField("payment_proof", event.target.files?.[0] || null)} required type="file" />
-                  </div>
-                )}
                 <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4">
                   <p className="mb-3 text-sm text-zinc-300">{t.vaccinationCertificate}</p>
                   <input accept=".pdf,image/*" data-testid="vaccination-certificate-input" onChange={(event) => updateField("vaccination_certificate", event.target.files?.[0] || null)} required type="file" />
@@ -598,6 +548,124 @@ const BookingPage = ({ config, programs, language, setLanguage, showAdminAccess 
         </Card>
       </main>
       <AppFooter config={config} />
+    </div>
+  );
+};
+
+const DepositPaymentPage = ({ language, setLanguage }) => {
+  const { token } = useParams();
+  const [searchParams] = useSearchParams();
+  const t = translations[language];
+  const [booking, setBooking] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [stripeLoading, setStripeLoading] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await publicApi.getBookingByDepositToken(token);
+        setBooking(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [token]);
+
+  useEffect(() => {
+    if (searchParams.get("stripe_cancel") === "true") {
+      toast.error(language === "es" ? translations.es.depositPaymentCancelled : translations.en.depositPaymentCancelled);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const lang = booking?.locale || language;
+  const tt = translations[lang] || t;
+  const fmt = (amount) => formatCurrency(amount, lang, booking?.currency || "USD");
+
+  const handleStripePayment = async () => {
+    setStripeLoading(true);
+    try {
+      const { url } = await publicApi.createStripeDepositSession(token);
+      window.location.href = url;
+    } catch (err) {
+      toast.error(err.message);
+      setStripeLoading(false);
+    }
+  };
+
+  if (loading) return <div className="flex min-h-screen items-center justify-center bg-black text-white">...</div>;
+
+  if (error || !booking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black p-4 text-center text-white" data-testid="deposit-link-error">
+        <div className="space-y-4">
+          <AlertTriangle className="mx-auto h-12 w-12 text-red-500" />
+          <p className="text-lg">{tt.depositPaymentLinkInvalid}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const DEPOSIT_PAID = ["Verified", "Deposit Paid", "Paid in Full"];
+  const depositPaid = DEPOSIT_PAID.includes(booking.payment_status) || searchParams.get("stripe_paid") === "true";
+  const notApproved = !["Approved", "Scheduled", "In Training", "Delivered"].includes(booking.status);
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-black p-4" data-testid="deposit-payment-page">
+      <Card className="w-full max-w-lg rounded-[2rem] border-white/10 bg-zinc-950 text-white">
+        <CardHeader className="text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-red-500">{booking.business_name}</p>
+          <CardTitle className="mt-2 text-2xl">{tt.depositPaymentPageTitle}</CardTitle>
+          <CardDescription className="text-zinc-400">{tt.depositPaymentPageSubtitle}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-3" data-testid="deposit-booking-summary">
+            <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{tt.bookingSummary}</p>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <p className="text-zinc-400">{tt.ownerLabel}</p>
+              <p className="text-zinc-200">{booking.owner_name}</p>
+              <p className="text-zinc-400">{tt.dogLabel}</p>
+              <p className="text-zinc-200">{booking.dog_name}</p>
+              <p className="text-zinc-400">{tt.programName}</p>
+              <p className="text-zinc-200">{lang === "es" ? booking.program_name_es : booking.program_name_en}</p>
+              <p className="text-zinc-400">{tt.reservationSummaryPrice}</p>
+              <p className="text-zinc-200">{fmt(booking.program_price)}</p>
+              <p className="text-zinc-400 font-semibold">{tt.depositAmountLabel}</p>
+              <p className="text-white font-semibold text-lg">{fmt(booking.deposit_amount)}</p>
+            </div>
+          </div>
+
+          {depositPaid ? (
+            <div className="rounded-2xl border border-green-500/20 bg-green-500/10 p-5 text-center text-green-200" data-testid="deposit-payment-confirmed">
+              <CheckCircle2 className="mx-auto mb-2 h-8 w-8" />
+              <p className="font-semibold">{tt.depositPaymentConfirmed}</p>
+              <p className="mt-1 text-sm text-green-300">{tt.depositPaymentConfirmedBody}</p>
+            </div>
+          ) : notApproved ? (
+            <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-5 text-center text-yellow-200" data-testid="deposit-not-approved-message">
+              <AlertTriangle className="mx-auto mb-2 h-8 w-8" />
+              <p>{tt.depositPaymentNotApproved}</p>
+            </div>
+          ) : booking.stripe_enabled ? (
+            <Button
+              className="w-full rounded-full bg-primary text-white hover:bg-red-700"
+              data-testid="stripe-pay-deposit-button"
+              disabled={stripeLoading}
+              onClick={handleStripePayment}
+              type="button"
+            >
+              {stripeLoading ? tt.depositPaymentStripeRedirecting : tt.depositPaymentPayWithCard}
+            </Button>
+          ) : (
+            <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-5 text-center text-yellow-200">
+              <p className="text-sm">{lang === "es" ? "El pago con tarjeta no está disponible en este momento. Contacta con PAWS TRAINING." : "Card payment is not available at this time. Please contact PAWS TRAINING."}</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
@@ -670,11 +738,12 @@ const FinalPaymentPage = ({ language, setLanguage }) => {
     );
   }
 
+  const DEPOSIT_PAID = ["Verified", "Deposit Paid", "Paid in Full"];
   const fullyPaid =
     booking.final_payment_status === "Verified" ||
     booking.payment_status === "Paid in Full" ||
     searchParams.get("stripe_paid") === "true";
-  const depositNotReady = booking.payment_status !== "Verified" && booking.payment_status !== "Paid in Full";
+  const depositNotReady = !DEPOSIT_PAID.includes(booking.payment_status);
   const alreadyUploaded = booking.final_payment_proof_uploaded;
 
   return (
@@ -770,6 +839,7 @@ const AppRoutes = ({ publicState, session, setSession, language, setLanguage, re
     <Routes>
       <Route path="/" element={<LandingPage config={publicState.config} language={language} programs={publicState.programs} setLanguage={setLanguage} showAdminAccess={showAdminAccess} />} />
       <Route path="/book" element={<BookingPage config={publicState.config} language={language} programs={publicState.programs} setLanguage={setLanguage} showAdminAccess={showAdminAccess} />} />
+      <Route path="/deposit/:token" element={<DepositPaymentPage language={language} setLanguage={setLanguage} />} />
       <Route path="/payment/:token" element={<FinalPaymentPage language={language} setLanguage={setLanguage} />} />
       <Route
         path="/admin/login"
